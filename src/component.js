@@ -176,8 +176,10 @@ class Component extends DCLogic {
     });
 
     // ---------- flow chart ----------
-    const W=1000,H=604,top=24,bot=92,ph=H-top-bot,baseY=top+ph,barW=58;
-    const cx=[140,360,580,800,950];
+    // viewBox aspect ~2.18:1 (wide) so the chart fills the panel width instead of
+    // letterboxing with big side margins under preserveAspectRatio=meet.
+    const W=1320,H=604,top=24,bot=92,ph=H-top-bot,baseY=top+ph,barW=58;
+    const cx=[150,450,750,1050,1235];
     const maxTot=Math.max(...cols.map(c=>TOT[c]),1);
     // fixed global scale: largest possible stacked bar across EVERY scope, so the y-axis stays consistent when filtering
     const _SCOPES=[null, ...T.catOrder.map(c=>T.evals.filter(e=>e.cat===c).map(e=>e.key)), ...T.evals.map(e=>[e.key])];
@@ -245,7 +247,7 @@ class Component extends DCLogic {
       [0,1,2].forEach(c=>{ order.forEach(f=>{ const a=segByKey(c,f.key), b=segByKey(c+1,f.key); if(a.h<0.4&&b.h<0.4)return; const dim=st.selFam&&st.selFam!==f.key; fk.push(h('path',{key:'r'+c+f.key,d:ribbon(cx[c]+barW/2,a.y0,a.y1,cx[c+1]-barW/2,b.y0,b.y1),fill:col(f.key),opacity:dim?(ribOp*0.2):ribOp,stroke:'none',style:{cursor:'pointer'},onMouseEnter:()=>this.setState({hover:{f:f.key,ribbon:true}})})); }); });
       cols.forEach(c=>{ seg[c].forEach(s=>{ if(s.h<0.4)return; const dim=st.selFam&&st.selFam!==s.key; const hov=st.hover&&st.hover.f===s.key&&st.hover.c===c; fk.push(h('rect',{key:'b'+c+s.key,x:cx[c]-barW/2,y:s.y0,width:barW,height:Math.max(1,s.h),fill:col(s.key),opacity:dim?0.16:(hov?1:0.9),rx:1.5,style:{cursor:'pointer'},onClick:()=>this.pickFam(s.key),onMouseEnter:()=>this.setState({hover:{f:s.key,c}}),onMouseLeave:()=>this.setState({hover:null})})); }); });
     }
-    if(st.showQwen){ fk.push(h('line',{key:'qd',x1:875,x2:875,y1:top-2,y2:baseY+36,stroke:'#D9D7D0',strokeWidth:1,strokeDasharray:'2 5'})); fk.push(h('text',{key:'qt',x:950,y:top+12,textAnchor:'middle',style:{font:'11px "Spline Sans Mono",monospace',fill:'#B7B5AE',letterSpacing:'.12em'}},'OFF-LINEAGE')); }
+    if(st.showQwen){ const qd=(cx[3]+cx[4])/2; fk.push(h('line',{key:'qd',x1:qd,x2:qd,y1:top-2,y2:baseY+36,stroke:'#D9D7D0',strokeWidth:1,strokeDasharray:'2 5'})); fk.push(h('text',{key:'qt',x:cx[4],y:top+12,textAnchor:'middle',style:{font:'11px "Spline Sans Mono",monospace',fill:'#B7B5AE',letterSpacing:'.12em'}},'OFF-LINEAGE')); }
     cols.forEach(c=>{ fk.push(h('text',{key:'xl'+c,x:cx[c],y:baseY+27,textAnchor:'middle',style:{font:(c===4?'600 13.5px':'600 17px')+' "Spline Sans",sans-serif',fill: c===4?'#8A8780':'#1D1D1B'}}, c===4?(T.qwen&&T.qwen.label||'Qwen3-32B'):COLLBL[c]));
       const sub = rateMode?(hasData(c)?fmtRate(EWRTOT[c])+' /tx':'no data'): txRateMode?(TXMGR&&hasData(c)?fmtPct(TXMGR[c])+' any mg':'no data'): ('n='+TOT[c]);
       fk.push(h('text',{key:'xn'+c,x:cx[c],y:baseY+43,textAnchor:'middle',style:{font:(rateMode?'600 12.5px':'12px')+' "Spline Sans Mono",monospace',fill: (rateMode||txRateMode)?'#46453F':'#A6A49D'}}, sub));

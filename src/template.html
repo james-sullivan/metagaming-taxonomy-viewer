@@ -149,7 +149,7 @@ html,body{margin:0;height:100%;background:#F6F5F2}
       <div style="font-size:19px;font-weight:600;letter-spacing:-.01em;line-height:1.1">Does the taxonomy of metagaming verbalizations change across Olmo 3 post-training checkpoints?</div>
     </div>
     <div style="flex:none;text-align:right;font-family:'Spline Sans Mono',monospace;font-size:10px;line-height:1.65;color:#5C5B57;white-space:nowrap">
-      <div><span style="color:#A6A49D">verbalizations</span> 2,022 quotes · 9,393 responses · 10 benchmarks</div>
+      <div><span style="color:#A6A49D">verbalizations</span> {{ statQuotes }} quotes · {{ statResponses }} responses · {{ statBenchmarks }} benchmarks</div>
       <div><span style="color:#A6A49D">scope</span> {{ scopeReadout }}</div>
     </div>
   </header>
@@ -209,14 +209,25 @@ html,body{margin:0;height:100%;background:#F6F5F2}
           <sc-for list="{{ benchGroups }}" as="g" hint-placeholder-count="3">
             <div style="display:flex;flex-direction:column;gap:6px;min-width:0">
               <button onclick="{{ g.onClick }}" style="{{ g.labelStyle }}">{{ g.label }} <span style="opacity:.7;font-weight:500">· {{ g.total }}</span></button>
-              <div style="display:flex;flex-wrap:wrap;gap:5px">
+              <div style="display:flex;flex-wrap:wrap;gap:9px">
                 <sc-for list="{{ g.chips }}" as="c" hint-placeholder-count="4">
-                  <button class="bm-chip" onclick="{{ c.onClick }}" style="{{ c.style }}">{{ c.label }} <span style="opacity:.55;font-family:'Spline Sans Mono',monospace">{{ c.count }}</span></button>
+                  <div style="display:flex;flex-direction:column;gap:3px;align-items:flex-start">
+                    <button class="bm-chip" onclick="{{ c.onClick }}" style="{{ c.style }}">{{ c.label }} <span style="opacity:.55;font-family:'Spline Sans Mono',monospace">{{ c.count }}</span></button>
+                    <div style="display:flex;align-items:flex-end;gap:4px;padding-left:2px;height:16px">
+                      <span style="display:flex;align-items:flex-end;gap:2px;height:16px">
+                        <sc-for list="{{ c.lenBars }}" as="b" hint-placeholder-count="4">
+                          <span title="{{ b.title }}" style="width:8px;border-radius:1px;background:{{ b.color }};opacity:.5;height:{{ b.h }}"></span>
+                        </sc-for>
+                      </span>
+                      <span style="font-family:'Spline Sans Mono',monospace;font-size:8px;color:#B7B5AE;line-height:1">{{ c.lenPeak }}</span>
+                    </div>
+                  </div>
                 </sc-for>
               </div>
             </div>
           </sc-for>
         </div>
+        <div style="font-family:'Spline Sans Mono',monospace;font-size:9px;line-height:1.5;color:#B7B5AE;margin-top:9px">Bars under each benchmark = mean transcript length (chars) across Base→SFT→DPO→RLVR, on one global scale; the number is that benchmark's peak mean.</div>
         <sc-if value="{{ benchDescShow }}" hint-placeholder-val="{{ false }}">
           <div style="margin-top:11px;padding-top:10px;border-top:1px solid #EFEDE7;display:flex;gap:11px;align-items:baseline">
             <span style="flex:none;font-family:'Spline Sans Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#A6A49D;padding-top:1px">{{ benchDescTag }}</span>
@@ -227,7 +238,7 @@ html,body{margin:0;height:100%;background:#F6F5F2}
 
       <div style="flex:1;min-height:{{ flowMin }}px;display:flex;flex-direction:column;background:#FFFFFF;border:1px solid #E4E2DC;border-radius:10px;padding:15px 20px 14px">
         <div style="flex:none;display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-bottom:6px">
-          <div style="font-size:15px;font-weight:600">Composition by stage <span style="font-weight:400;color:#93918B;font-size:12.5px">— {{ flowSub }}</span></div>
+          <div style="font-size:15px;font-weight:600">{{ flowTitle }} <span style="font-weight:400;color:#93918B;font-size:12.5px">— {{ flowSub }}</span></div>
           <div style="font-family:'Spline Sans Mono',monospace;font-size:12px;color:#5C5B57;min-height:16px">{{ hoverInfo }}</div>
         </div>
         <div style="flex:1;min-height:0;position:relative" onmousemove="{{ onFlowMove }}" onmouseleave="{{ onFlowLeave }}">

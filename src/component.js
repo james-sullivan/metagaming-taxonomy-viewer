@@ -55,7 +55,7 @@ class Component extends DCLogic {
   renderVals(){
     const h=React.createElement;
     const T=window.TAXO;
-    if(!T) return { ready:false, hasSel:false, legend:[], benchGroups:[], flowChart:null, detRows:[], detBench:[], detQuotes:[], stageChips:[], tipShow:false, flowMin:440, benchDescShow:false, benchDescTag:'', benchDescText:'', benchDescUrl:'', detClass:[], onFlowMove:this.onFlowMove, onFlowLeave:this.onFlowLeave };
+    if(!T) return { ready:false, hasSel:false, legend:[], benchGroups:[], flowChart:null, flowTitle:'Composition by stage', statQuotes:'', statResponses:'', statBenchmarks:'', detRows:[], detBench:[], detQuotes:[], stageChips:[], tipShow:false, flowMin:440, benchDescShow:false, benchDescTag:'', benchDescText:'', benchDescUrl:'', detClass:[], onFlowMove:this.onFlowMove, onFlowLeave:this.onFlowLeave };
     const st=this.state, P=this.props||{};
     const measure = st.measure || P.defaultMeasure || 'rate';
     const share = measure==='share';
@@ -64,10 +64,18 @@ class Component extends DCLogic {
     const ribOp=(P.ribbonOpacity!=null)?+P.ribbonOpacity:0.2;
     const hideNoise=!!P.hideNoise;
     const flowMin=P.flowHeight||440;
-    const col=(k)=>PAL[k]||'#888';
+    // color lookup: editorial palette first, then the family's own exported color, then grey.
+    // The fallback keeps every family colored even if the taxonomy is re-clustered with new keys.
+    const famColor={}; (T.families||[]).forEach(f=>{ if(f.color) famColor[f.key]=f.color; });
+    const col=(k)=>PAL[k]||famColor[k]||'#888';
     const fmtPct=(v)=> (v*100).toFixed(v>0&&v<0.095?1:0)+'%';
     const cols = st.showQwen ? [0,1,2,3,4] : [0,1,2,3];
     const lin=[0,1,2,3];
+    // header provenance stats (dynamic, so they track the active run's data)
+    const _nf=(x)=>x.toLocaleString('en-US');
+    const statQuotes=_nf((T.totals||[]).reduce((a,b)=>a+b,0));
+    const statResponses=_nf((T.stageSamples||[]).reduce((a,b)=>a+b,0));
+    const statBenchmarks=(T.evals||[]).length;
 
     const evals = this.activeEvals(T);
     // effective counts per family under scope
@@ -92,6 +100,16 @@ class Component extends DCLogic {
       return val.reduce((s,e)=>s+((f.byEval[e]||[])[c]||0)/T.sampleTotals[e][c],0)/val.length;
     });});
     const EWRTOT=[0,1,2,3,4].map(c=>order.reduce((s,f)=>s+EWRATE[f.key][c],0));
+    // equal-weighted per-family TRANSCRIPT rate: fraction of transcripts with >=1 quote
+    // in this family, averaged evenly across active benchmarks. Independent per family
+    // (a transcript can land in several families) so these do NOT sum across families.
+    const EWTXRATE={};
+    T.families.forEach(f=>{EWTXRATE[f.key]=[0,1,2,3,4].map(c=>{
+      const act=evals||T.evals.map(e=>e.key);
+      const val=act.filter(e=>(T.sampleTotals[e]||[])[c]>0);
+      if(!val.length)return 0;
+      return val.reduce((s,e)=>s+(((f.txByEval&&f.txByEval[e])||[])[c]||0)/T.sampleTotals[e][c],0)/val.length;
+    });});
     // transcript metagaming rate per stage (equal-weighted)
     const TXMGR=T.transcriptMgCounts?[0,1,2,3,4].map(c=>{
       const act=evals||T.evals.map(e=>e.key);
@@ -107,6 +125,17 @@ class Component extends DCLogic {
     const filtering = st.scope!=='all';
     const INK='#23231F';
     const chipBase='font-family:\'Spline Sans\',sans-serif;font-size:11px;padding:3px 11px;border-radius:999px;cursor:pointer;white-space:nowrap;';
+    // global max mean transcript length across every benchmark x lineage checkpoint (Base->RLVR),
+    // so the mini length bars under each benchmark are on ONE honest scale (not auto-scaled per eval).
+    const TL=T.transcriptLengths||{};
+    let GLEN=1;
+    T.evals.forEach(e=>{ const a=TL[e.key]; if(a)[0,1,2,3].forEach(c=>{ const m=a[c]&&a[c].mean; if(m)GLEN=Math.max(GLEN,m); }); });
+    const fmtLen=(m)=> m>=1000?(m/1000).toFixed(m<10000?1:0)+'k':String(Math.round(m));
+    // mini length graph as HTML div-bars (same proven pattern as the legend sparkline).
+    // Heights share ONE global scale (GLEN) so benchmarks are honestly comparable.
+    const lenBarsFor=(ekey,cat)=>{ const a=TL[ekey]||[]; const c0=CAT[cat]||'#999';
+      return [0,1,2,3].map(c=>{ const m=(a[c]&&a[c].mean)||0; const hh=m>0?Math.max(1.5,(m/GLEN)*16):0;
+        return { color:c0, h:hh.toFixed(1)+'px', title:COLLBL[c]+': '+(m?fmtLen(m):'—')+' chars' }; }); };
     const benchGroups = T.catOrder.map(cat=>{
       const es=T.evals.filter(e=>e.cat===cat);
       const gtot=es.reduce((s,e)=>s+evTot(e.key),0);
@@ -121,7 +150,9 @@ class Component extends DCLogic {
           if(selected) s='background:'+INK+';color:#fff;border:1px solid '+INK+';font-weight:600';
           else if(catActive) s='background:#ECEAE4;color:#33332E;border:1px solid #C7C3B9';
           else s='background:#FFFFFF;color:#54534E;border:1px solid #E0DDD5'+(filtering?';opacity:.38':'');
-          return { label:e.label, count:evTot(e.key), onClick:()=>this.setScope('eval:'+e.key), style:chipBase+s }; })
+          const peakLen=Math.max(...[0,1,2,3].map(c=>((TL[e.key]||[])[c]&&TL[e.key][c].mean)||0));
+          return { label:e.label, count:evTot(e.key), onClick:()=>this.setScope('eval:'+e.key), style:chipBase+s,
+                   lenBars:lenBarsFor(e.key,cat), lenPeak:peakLen?fmtLen(peakLen):'' }; })
       };
     });
     const allBenchStyle = filtering
@@ -134,9 +165,10 @@ class Component extends DCLogic {
     const benchNote = filtering ? ('— showing: '+scopeShort) : '— filter the view by class or a single benchmark';
 
     // ---------- legend ----------
+    const legendRate = txRateMode ? EWTXRATE : EWRATE;
     const legend = order.map(f=>{
-      const peak=Math.max(...lin.map(c=> EWRATE[f.key][c]), 1e-9);
-      const spark=lin.map(c=>({ color:col(f.key), h: Math.max(2,(EWRATE[f.key][c])/peak*18).toFixed(1)+'px' }));
+      const peak=Math.max(...lin.map(c=> legendRate[f.key][c]), 1e-9);
+      const spark=lin.map(c=>({ color:col(f.key), h: Math.max(2,(legendRate[f.key][c])/peak*18).toFixed(1)+'px' }));
       const on=st.selFam===f.key;
       return { key:f.key, label:f.label, color:col(f.key), total:lintot(f), spark,
         onClick:()=>this.pickFam(f.key),
@@ -173,31 +205,59 @@ class Component extends DCLogic {
       const rt=val.reduce((s,e)=>s+((T.transcriptMgCounts[e]||[])[c]||0)/T.sampleTotals[e][c],0)/val.length;
       GRATE_TX=Math.max(GRATE_TX,rt);
     }});}
+    // stable axis max for the PER-FAMILY transcript rate (Tx% view) across all scopes + families
+    let GRATE_TXFAM=1e-9;
+    _SCOPES.forEach(ev=>{for(let c=0;c<5;c++){
+      const act=ev||T.evals.map(e=>e.key);
+      const val=act.filter(e=>(T.sampleTotals[e]||[])[c]>0);
+      if(!val.length)continue;
+      order.forEach(f=>{
+        const rt=val.reduce((s,e)=>s+(((f.txByEval&&f.txByEval[e])||[])[c]||0)/T.sampleTotals[e][c],0)/val.length;
+        GRATE_TXFAM=Math.max(GRATE_TXFAM,rt);
+      });
+    }});
     const niceCeil=(v)=>{ if(v<=0)return 1; const mg=Math.pow(10,Math.floor(Math.log10(v))); const n=v/mg; return mg*[1,1.2,1.5,2,2.5,3,4,5,6,8,10].find(x=>x>=n-1e-9); };
-    const AXR_EW = niceCeil(GRATE_EW), AXR_TX = niceCeil(GRATE_TX), AXR = niceCeil(GRATE), AXT = niceCeil(GTOT);
+    const AXR_EW = niceCeil(GRATE_EW), AXR_TX = niceCeil(GRATE_TX), AXR_TXFAM = niceCeil(GRATE_TXFAM), AXR = niceCeil(GRATE), AXT = niceCeil(GTOT);
     const segH=(fkey,cnt,c)=> share?(cnt/(TOT[c]||1))*ph: rateMode?(EWRATE[fkey][c]/AXR_EW)*ph: txRateMode&&TXMGR?((TOT[c]>0?cnt/TOT[c]:0)*TXMGR[c]/AXR_TX)*ph: (cnt/AXT)*ph;
     const seg={};
     cols.forEach(c=>{ let y=baseY; seg[c]=order.map(f=>{ const cnt=EFF[f.key][c], hh=segH(f.key,cnt,c); const o={key:f.key,count:cnt,y0:y-hh,y1:y,h:hh}; y-=hh; return o; }); });
     const segByKey=(c,k)=> seg[c][order.findIndex(f=>f.key===k)];
     const ribbon=(x1,a0,a1,x2,b0,b1)=>{ const mx=(x1+x2)/2; return `M${x1},${a0} C${mx},${a0} ${mx},${b0} ${x2},${b0} L${x2},${b1} C${mx},${b1} ${mx},${a1} ${x1},${a1} Z`; };
     const fk=[];
-    [0,1,2].forEach(c=>{ order.forEach(f=>{ const a=segByKey(c,f.key), b=segByKey(c+1,f.key); if(a.h<0.4&&b.h<0.4)return; const dim=st.selFam&&st.selFam!==f.key; fk.push(h('path',{key:'r'+c+f.key,d:ribbon(cx[c]+barW/2,a.y0,a.y1,cx[c+1]-barW/2,b.y0,b.y1),fill:col(f.key),opacity:dim?(ribOp*0.2):ribOp,stroke:'none',style:{cursor:'pointer'},onMouseEnter:()=>this.setState({hover:{f:f.key,ribbon:true}})})); }); });
-    cols.forEach(c=>{ seg[c].forEach(s=>{ if(s.h<0.4)return; const dim=st.selFam&&st.selFam!==s.key; const hov=st.hover&&st.hover.f===s.key&&st.hover.c===c; fk.push(h('rect',{key:'b'+c+s.key,x:cx[c]-barW/2,y:s.y0,width:barW,height:Math.max(1,s.h),fill:col(s.key),opacity:dim?0.16:(hov?1:0.9),rx:1.5,style:{cursor:'pointer'},onClick:()=>this.pickFam(s.key),onMouseEnter:()=>this.setState({hover:{f:s.key,c}}),onMouseLeave:()=>this.setState({hover:null})})); }); });
+    if(txRateMode){
+      // ----- Tx% view: one bar PER FAMILY per checkpoint (grouped, NOT stacked). -----
+      // Each bar = fraction of transcripts with >=1 quote in that family. Bars are
+      // independent (a transcript can fall in several families) so they don't stack.
+      const nf=order.length||1;
+      const GW=Math.min(140, 28*nf+14);                 // group width within a checkpoint
+      const innerGap=Math.max(1.5, Math.min(6, 54/nf));
+      const bw2=Math.max(3,(GW-innerGap*(nf-1))/nf);
+      cols.forEach(c=>{ if(!hasData(c))return; order.forEach((f,fi)=>{
+        const rt=EWTXRATE[f.key][c], hgt=(rt/AXR_TXFAM)*ph;
+        const x=cx[c]-GW/2+fi*(bw2+innerGap);
+        const dim=st.selFam&&st.selFam!==f.key, hov=st.hover&&st.hover.f===f.key&&st.hover.c===c;
+        fk.push(h('rect',{key:'tb'+c+f.key,x:x,y:baseY-hgt,width:bw2,height:Math.max(1,hgt),fill:col(f.key),opacity:dim?0.16:(hov?1:0.92),rx:1.5,style:{cursor:'pointer'},onClick:()=>this.pickFam(f.key),onMouseEnter:()=>this.setState({hover:{f:f.key,c}}),onMouseLeave:()=>this.setState({hover:null})}));
+      }); });
+    } else {
+      // ----- stacked composition + flow ribbons (share / rate / count) -----
+      [0,1,2].forEach(c=>{ order.forEach(f=>{ const a=segByKey(c,f.key), b=segByKey(c+1,f.key); if(a.h<0.4&&b.h<0.4)return; const dim=st.selFam&&st.selFam!==f.key; fk.push(h('path',{key:'r'+c+f.key,d:ribbon(cx[c]+barW/2,a.y0,a.y1,cx[c+1]-barW/2,b.y0,b.y1),fill:col(f.key),opacity:dim?(ribOp*0.2):ribOp,stroke:'none',style:{cursor:'pointer'},onMouseEnter:()=>this.setState({hover:{f:f.key,ribbon:true}})})); }); });
+      cols.forEach(c=>{ seg[c].forEach(s=>{ if(s.h<0.4)return; const dim=st.selFam&&st.selFam!==s.key; const hov=st.hover&&st.hover.f===s.key&&st.hover.c===c; fk.push(h('rect',{key:'b'+c+s.key,x:cx[c]-barW/2,y:s.y0,width:barW,height:Math.max(1,s.h),fill:col(s.key),opacity:dim?0.16:(hov?1:0.9),rx:1.5,style:{cursor:'pointer'},onClick:()=>this.pickFam(s.key),onMouseEnter:()=>this.setState({hover:{f:s.key,c}}),onMouseLeave:()=>this.setState({hover:null})})); }); });
+    }
     if(st.showQwen){ fk.push(h('line',{key:'qd',x1:875,x2:875,y1:top-2,y2:baseY+36,stroke:'#D9D7D0',strokeWidth:1,strokeDasharray:'2 5'})); fk.push(h('text',{key:'qt',x:950,y:top+12,textAnchor:'middle',style:{font:'11px "Spline Sans Mono",monospace',fill:'#B7B5AE',letterSpacing:'.12em'}},'OFF-LINEAGE')); }
     cols.forEach(c=>{ fk.push(h('text',{key:'xl'+c,x:cx[c],y:baseY+27,textAnchor:'middle',style:{font:(c===4?'600 13.5px':'600 17px')+' "Spline Sans",sans-serif',fill: c===4?'#8A8780':'#1D1D1B'}}, c===4?(T.qwen&&T.qwen.label||'Qwen3-32B'):COLLBL[c]));
-      const sub = rateMode?(hasData(c)?fmtRate(EWRTOT[c])+' /tx':'no data'): txRateMode?(TXMGR&&hasData(c)?fmtPct(TXMGR[c])+' of tx':'no data'): ('n='+TOT[c]);
-      fk.push(h('text',{key:'xn'+c,x:cx[c],y:baseY+43,textAnchor:'middle',style:{font:(rateMode?'600 12.5px':'12px')+' "Spline Sans Mono",monospace',fill: rateMode?'#46453F':'#A6A49D'}}, sub));
-      if(rateMode) fk.push(h('text',{key:'xs'+c,x:cx[c],y:baseY+55,textAnchor:'middle',style:{font:'10px "Spline Sans Mono",monospace',fill:'#B7B5AE'}}, SAMP[c]?(TOT[c]+' / '+SAMP[c]):'')); });
+      const sub = rateMode?(hasData(c)?fmtRate(EWRTOT[c])+' /tx':'no data'): txRateMode?(TXMGR&&hasData(c)?fmtPct(TXMGR[c])+' any mg':'no data'): ('n='+TOT[c]);
+      fk.push(h('text',{key:'xn'+c,x:cx[c],y:baseY+43,textAnchor:'middle',style:{font:(rateMode?'600 12.5px':'12px')+' "Spline Sans Mono",monospace',fill: (rateMode||txRateMode)?'#46453F':'#A6A49D'}}, sub));
+      if(rateMode||txRateMode) fk.push(h('text',{key:'xs'+c,x:cx[c],y:baseY+55,textAnchor:'middle',style:{font:'10px "Spline Sans Mono",monospace',fill:'#B7B5AE'}}, SAMP[c]?(rateMode?(TOT[c]+' / '+SAMP[c]):('n='+SAMP[c]+' tx')):'')); });
     // ---------- x axis caption: Olmo 3 post-training lineage ----------
     { const xb0=cx[0]-barW/2, xb3=cx[3]+barW/2, yb=baseY+68, xmid=(cx[0]+cx[3])/2;
       fk.push(h('path',{key:'xbr',d:`M${xb0},${yb-5} L${xb0},${yb} L${xb3},${yb} L${xb3},${yb-5}`,fill:'none',stroke:'#D4D1CA',strokeWidth:1}));
       fk.push(h('text',{key:'xbt',x:xmid,y:yb+15,textAnchor:'middle',style:{font:'600 10.5px "Spline Sans Mono",monospace',fill:'#7A7872',letterSpacing:'.12em'}},'OLMO 3 POST-TRAINING CHECKPOINTS')); }
     // ---------- y axis ----------
-    const axisMax = share?1: rateMode?AXR_EW: txRateMode?AXR_TX: AXT;
+    const axisMax = share?1: rateMode?AXR_EW: txRateMode?AXR_TXFAM: AXT;
     const yOf = (v)=> baseY - (axisMax ? (v/axisMax)*ph : 0);
     const axisX = 92, lastCx = cx[cols[cols.length-1]], gridX2 = lastCx + barW/2;
     const fmtY = (v)=> (share||txRateMode)?Math.round(v*100)+'%': rateMode?(+v.toFixed(2)).toString(): String(Math.round(v));
-    const yTitle = (share?'% of stage': rateMode?'quotes / transcript': txRateMode?'% transcripts w/ metagaming':'quote count').toUpperCase();
+    const yTitle = (share?'% of stage': rateMode?'quotes / transcript': txRateMode?'% transcripts w/ family quote':'quote count').toUpperCase();
     const yAxis=[];
     [0,0.25,0.5,0.75,1].forEach((t,i)=>{ const v=t*axisMax, y=yOf(v);
       yAxis.push(h('line',{key:'yg'+i,x1:axisX,x2:gridX2,y1:y,y2:y,stroke:'#ECEAE4',strokeWidth:1,strokeDasharray:i===0?'none':'2 5'}));
@@ -207,7 +267,8 @@ class Component extends DCLogic {
     fk.unshift(...yAxis);
     const flowChart=h('svg',{viewBox:`0 0 ${W} ${H}`,preserveAspectRatio:'xMidYMid meet',onMouseMove:this.onFlowMove,style:{position:'absolute',inset:0,width:'100%',height:'100%',overflow:'visible'}},fk);
 
-    const flowSub = (share?'share of each stage’s verbalizations':rateMode?'metagaming quotes per transcript — height = rate':'absolute quote counts (height scaled to peak stage)') + ' · '+scopeShort;
+    const flowSub = (share?'share of each stage’s verbalizations':rateMode?'metagaming quotes per transcript — height = rate':txRateMode?'% of transcripts with ≥1 quote in each family — one bar per family, not stacked':'absolute quote counts (height scaled to peak stage)') + ' · '+scopeShort;
+    const flowTitle = txRateMode?'Transcript coverage by family':'Composition by stage';
 
     // ---------- tooltip ----------
     let hoverInfo='';
@@ -223,7 +284,7 @@ class Component extends DCLogic {
         tipLine2 = rateMode
           ? (hasData(c)? (fmtRate(EWRATE[f.key][c])+' /tx  ·  n='+EFF[f.key][c]) : 'no responses')
           : txRateMode
-          ? (TXMGR&&hasData(c)? fmtPct(TXMGR[c])+' of transcripts  ·  n='+SAMP[c] : 'no data')
+          ? (hasData(c)? fmtPct(EWTXRATE[f.key][c])+' of transcripts have a '+f.label.toLowerCase()+' quote' : 'no data')
           : ('n='+EFF[f.key][c]+'   ·   '+fmtPct(EFF[f.key][c]/(TOT[c]||1))+' of stage'); }
     }
 
@@ -277,7 +338,7 @@ class Component extends DCLogic {
     const offStyle='flex:1;padding:7px 3px;font-family:\'Spline Sans Mono\',monospace;font-size:10.5px;font-weight:500;cursor:pointer;border:none;background:#FFFFFF;color:#7A7872';
     const measureHint = share?'Each stage normalized to 100%. Composition only — ignores how much metagaming occurs.'
       : rateMode?'Quotes per transcript (equal-weighted across benchmarks, so each benchmark contributes equally regardless of sample count).'
-      : txRateMode?'Fraction of transcripts containing at least one metagaming verbalization, equal-weighted across benchmarks.'
+      : txRateMode?'One bar per family = fraction of transcripts with ≥1 quote in that family (equal-weighted across benchmarks). Independent per family, so bars do not sum.'
       : 'Raw quote counts. Confounded — sampling differs by benchmark and stage.';
 
     // ---------- benchmark description (shown when a single benchmark is selected) ----------
@@ -285,7 +346,8 @@ class Component extends DCLogic {
     if(st.scope.startsWith('eval:')){ const d=this.BENCHDESC[st.scope.slice(5)]; if(d){ benchDescShow=true; benchDescTag=d.tag; benchDescText=d.desc; benchDescUrl=d.src; } }
 
     return {
-      ready:true, legend, flowChart, flowSub, hoverInfo, flowMin,
+      ready:true, legend, flowChart, flowSub, flowTitle, hoverInfo, flowMin,
+      statQuotes, statResponses, statBenchmarks,
       benchGroups, totalAll, allBench:this.allBench, allBenchStyle, allBenchLabel, benchNote, scopeReadout, scopeShort,
       measureHint,
       benchDescShow, benchDescTag, benchDescText, benchDescUrl,

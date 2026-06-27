@@ -229,7 +229,9 @@ class Component extends DCLogic {
       // Each bar = fraction of transcripts with >=1 quote in that family. Bars are
       // independent (a transcript can fall in several families) so they don't stack.
       const nf=order.length||1;
-      const GW=Math.min(140, 28*nf+14);                 // group width within a checkpoint
+      // group width within a checkpoint, clamped so the leftmost group (centered at
+      // cx[0]=140) stays right of the y-axis (x=92): cx[0]-GW/2 >= 96  ->  GW <= 88.
+      const GW=Math.min(140, 28*nf+14, 2*(cx[0]-96));
       const innerGap=Math.max(1.5, Math.min(6, 54/nf));
       const bw2=Math.max(3,(GW-innerGap*(nf-1))/nf);
       cols.forEach(c=>{ if(!hasData(c))return; order.forEach((f,fi)=>{

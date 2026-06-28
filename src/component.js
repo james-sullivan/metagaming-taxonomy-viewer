@@ -299,7 +299,9 @@ class Component extends DCLogic {
       selColor=col(selFamObj.key);
       selName=selFamObj.label;
       const ec=EFF[selFamObj.key], sTot=ec[0]+ec[1]+ec[2]+ec[3];
-      selKicker=sTot+' quotes across lineage · '+scopeShort;
+      // VEA share of this family (eval_aware quotes / VEA-labeled quotes across lineage)
+      const _vL=(selFamObj.veaLabeled||[]).reduce((a,b)=>a+b,0), _vE=(selFamObj.veaCount||[]).reduce((a,b)=>a+b,0);
+      selKicker=sTot+' quotes across lineage · '+scopeShort+(_vL?' · '+Math.round(_vE/_vL*100)+'% VEA (of '+_vL+' labeled)':'');
       const famMaxRate=Math.max(...cols.map(c=>EWRATE[selFamObj.key][c]),1e-9);
       detRows=cols.map(c=>{ const cnt=ec[c], shr=cnt/(TOT[c]||1), rr=EWRATE[selFamObj.key][c];
         const big = share?fmtPct(shr): rateMode?(hasData(c)?fmtRate(rr)+' /tx':'—'): txRateMode?'—' : String(cnt);
@@ -328,9 +330,13 @@ class Component extends DCLogic {
         ? 'font-family:\'Spline Sans Mono\',monospace;font-size:8.5px;font-weight:600;letter-spacing:.04em;color:#8A8780;border:1px solid #D4D1CA;padding:1px 5px;border-radius:3px'
         : 'font-family:\'Spline Sans Mono\',monospace;font-size:8.5px;font-weight:600;letter-spacing:.04em;color:#3A4A45;background:#E4ECE9;padding:1px 5px;border-radius:3px';
       const elabel=(k)=>{ const e=T.evals.find(x=>x.key===k); return e?e.label:k; };
+      // VEA badge (purple) on eval_aware quotes; shows the 0-100 accuracy when present.
+      const veaBadgeStyle='font-family:\'Spline Sans Mono\',monospace;font-size:8.5px;font-weight:700;letter-spacing:.04em;color:#7A3E9A;background:#F0E6F7;padding:1px 5px;border-radius:3px';
       detQuotes=filt.slice(0,16).map(q=>{ const showEv = evals ? q.ev.filter(e=>evals.includes(e)) : q.ev; const ev0=showEv[0]||q.ev[0];
+        const badges=q.cols.map(c=>({ label:COLLBL[c], style:badgeStyle(c) }));
+        if(q.vea==='eval_aware') badges.push({ label:(q.acc!=null?'VEA '+q.acc:'VEA'), style:veaBadgeStyle });
         return { t:q.t, evLabel: elabel(ev0)+(showEv.length>1?' +'+(showEv.length-1):''), catColor:T.catColor[q.c]||'#999',
-          badges:q.cols.map(c=>({ label:COLLBL[c], style:badgeStyle(c) })) }; });
+          badges }; });
       moreQuotes = filt.length>16 ? ('+ '+(filt.length-16)+' more (of '+filt.length+' sampled)') : '';
       quoteCount = filt.length+' shown'+(st.qStage==='all'?'':' · '+COLLBL[st.qStage]);
       stageChips=['all',...cols].map(c=>{ const active=st.qStage===c; const lbl=c==='all'?'All':COLLBL[c];

@@ -379,10 +379,16 @@ class Component extends DCLogic {
       const h10=[0,0,0,0,0,0,0,0,0,0];
       actEv.forEach(e=>{ const a=(accHist[e]||[])[c]; if(a) for(let b=0;b<10;b++) h10[b]+=(a[b]||0); });
       const tot=h10.reduce((a,b)=>a+b,0);
-      const bands=ACCBAND.map((color,bi)=>{
+      // build segments low->high; insert a bold cutoff divider before the first
+      // included band so it's obvious which bands are counted vs excluded.
+      const bands=[]; let divDone=false;
+      ACCBAND.forEach((color,bi)=>{
+        const inc = BAND_LO[bi]>=thrBucket;
+        if(inc && !divDone){ bands.push({ divider:true, w:'3px', color:'#23231F', op:'1', filt:'none', n:0, lbl:'cutoff ≥ '+accThr }); divDone=true; }
         let n=0; for(let b=BAND_LO[bi]; b<=BAND_HI[bi]; b++) n+=h10[b];
-        return { w: tot?(n/tot*100).toFixed(2)+'%':'0%', color, n,
-                 lbl: ACCLBL[bi]+': '+n, op: BAND_LO[bi]>=thrBucket?'1':'0.3' }; });
+        bands.push({ divider:false, w: tot?(n/tot*100).toFixed(2)+'%':'0%', color, n,
+                     op: inc?'1':'0.4', filt: inc?'none':'grayscale(0.8)',
+                     lbl: ACCLBL[bi]+': '+n+(inc?'  · counted (≥'+accThr+')':'  · excluded (<'+accThr+')') }); });
       let ge=0; for(let b=thrBucket;b<10;b++) ge+=h10[b];
       return { label:COLLBL[c], lblColor:c===4?'#A6A49D':'#46453F', tot, bands, geN:ge,
                geTxt: tot? Math.round(ge/tot*100)+'%' : '—' }; });

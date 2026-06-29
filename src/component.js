@@ -1,6 +1,6 @@
 
 class Component extends DCLogic {
-  state = { measure:null, showQwen:true, selFam:null, qStage:'all', scope:'all', hover:null, hx:0, hy:0, hw:0, hh:0 };
+  state = { measure:null, showQwen:true, selFam:null, qStage:'all', scope:'all', accThr:70, hover:null, hx:0, hy:0, hw:0, hh:0 };
 
   componentDidMount(){ this._tick(0); }
   _tick(n){ if(window.TAXO){ this.forceUpdate(); } else if(n<80){ setTimeout(()=>this._tick(n+1),40); } }
@@ -15,6 +15,7 @@ class Component extends DCLogic {
   setQStage=(c)=>this.setState(s=>({qStage:s.qStage===c?'all':c}));
   setScope=(v)=>this.setState(s=>({scope:s.scope===v?'all':v}));
   allBench=()=>this.setState({scope:'all'});
+  setAccThr=(t)=>this.setState({accThr:t});
   onFlowMove=(e)=>{ const r=e.currentTarget.getBoundingClientRect(); this.setState({hx:e.clientX-r.left, hy:e.clientY-r.top, hw:r.width, hh:r.height}); };
   onFlowLeave=()=>this.setState({hover:null});
 
@@ -55,7 +56,7 @@ class Component extends DCLogic {
   renderVals(){
     const h=React.createElement;
     const T=window.TAXO;
-    if(!T) return { ready:false, hasSel:false, legend:[], benchGroups:[], flowChart:null, flowTitle:'Composition by stage', statQuotes:'', statResponses:'', statBenchmarks:'', detRows:[], detBench:[], detQuotes:[], stageChips:[], tipShow:false, flowMin:440, benchDescShow:false, benchDescTag:'', benchDescText:'', benchDescUrl:'', detClass:[], onFlowMove:this.onFlowMove, onFlowLeave:this.onFlowLeave };
+    if(!T) return { ready:false, hasSel:false, legend:[], benchGroups:[], flowChart:null, flowTitle:'Composition by stage', statQuotes:'', statResponses:'', statBenchmarks:'', detRows:[], detBench:[], detQuotes:[], stageChips:[], tipShow:false, flowMin:440, benchDescShow:false, benchDescTag:'', benchDescText:'', benchDescUrl:'', detClass:[], veaSplit:[], accBands:[], accThrChips:[], accReady:false, eaSub:'', veaColLbl:'', mgColLbl:'', veaSwatch:'#7A3E9A', mgSwatch:'#2C6E63', onFlowMove:this.onFlowMove, onFlowLeave:this.onFlowLeave };
     const st=this.state, P=this.props||{};
     const measure = st.measure || P.defaultMeasure || 'rate';
     const share = measure==='share';
@@ -355,12 +356,50 @@ class Component extends DCLogic {
     let benchDescShow=false, benchDescTag='', benchDescText='', benchDescUrl='';
     if(st.scope.startsWith('eval:')){ const d=this.BENCHDESC[st.scope.slice(5)]; if(d){ benchDescShow=true; benchDescTag=d.tag; benchDescText=d.desc; benchDescUrl=d.src; } }
 
+    // ---------- Eval-awareness by model (Feature A: MG vs VEA split; Feature B: accuracy) ----------
+    // Both honor the visible stages (cols / Show-Qwen) and the benchmark scope filter (actEv).
+    const actEv = evals || T.evals.map(e=>e.key);
+    const VEA_COL='#7A3E9A', MG_COL='#2C6E63';
+    const veaSplit = cols.map(c=>{
+      const veaN = actEv.reduce((s,e)=> s + ((T.quoteVeaCounts[e]||[])[c]||0), 0);
+      const labN = actEv.reduce((s,e)=> s + ((T.quoteVeaLabeled[e]||[])[c]||0), 0);
+      const mgN  = Math.max(0, labN - veaN), tot = veaN + mgN;
+      const veaPct = tot? veaN/tot : 0, mgPct = tot? mgN/tot : 0;
+      return { label:COLLBL[c], lblColor:c===4?'#A6A49D':'#46453F', veaN, mgN, tot,
+               veaW:(veaPct*100).toFixed(2)+'%', mgW:(mgPct*100).toFixed(2)+'%',
+               veaColor:VEA_COL, mgColor:MG_COL,
+               veaPctTxt: tot? Math.round(veaPct*100)+'%' : '—',
+               title:'VEA '+veaN+' · metagaming-only '+mgN+' of '+tot }; });
+    const accReady = !!T.quoteAccHist;
+    const accHist = T.quoteAccHist || {};
+    const accThr = st.accThr!=null ? st.accThr : 70;
+    const ACCBAND=['#C0443B','#D98A3B','#7FB07A','#2C6E63'], ACCLBL=['0–49','50–69','70–89','90–100'];
+    const BAND_LO=[0,5,7,9], BAND_HI=[4,6,8,9], thrBucket=Math.round(accThr/10);
+    const accBands = cols.map(c=>{
+      const h10=[0,0,0,0,0,0,0,0,0,0];
+      actEv.forEach(e=>{ const a=(accHist[e]||[])[c]; if(a) for(let b=0;b<10;b++) h10[b]+=(a[b]||0); });
+      const tot=h10.reduce((a,b)=>a+b,0);
+      const bands=ACCBAND.map((color,bi)=>{
+        let n=0; for(let b=BAND_LO[bi]; b<=BAND_HI[bi]; b++) n+=h10[b];
+        return { w: tot?(n/tot*100).toFixed(2)+'%':'0%', color, n,
+                 lbl: ACCLBL[bi]+': '+n, op: BAND_LO[bi]>=thrBucket?'1':'0.3' }; });
+      let ge=0; for(let b=thrBucket;b<10;b++) ge+=h10[b];
+      return { label:COLLBL[c], lblColor:c===4?'#A6A49D':'#46453F', tot, bands, geN:ge,
+               geTxt: tot? Math.round(ge/tot*100)+'%' : '—' }; });
+    const accThrChips=[50,70,90].map(t=>({ label:'≥ '+t, onClick:()=>this.setAccThr(t),
+      style: chipBase + (accThr===t
+        ? 'background:#2C6E63;color:#fff;border:1px solid #2C6E63;font-weight:600'
+        : 'background:#FFFFFF;color:#54534E;border:1px solid #E0DDD5') }));
+    const eaSub = scopeShort;
+
     return {
       ready:true, legend, flowChart, flowSub, flowTitle, hoverInfo, flowMin,
       statQuotes, statResponses, statBenchmarks,
       benchGroups, totalAll, allBench:this.allBench, allBenchStyle, allBenchLabel, benchNote, scopeReadout, scopeShort,
       measureHint,
       benchDescShow, benchDescTag, benchDescText, benchDescUrl,
+      veaSplit, veaColLbl:'eval-aware (VEA)', mgColLbl:'metagaming-only', veaSwatch:VEA_COL, mgSwatch:MG_COL,
+      accReady, accBands, accThrChips, accThr, eaSub,
       shareBtnStyle: share?onStyle:offStyle, rateBtnStyle: rateMode?onStyle:offStyle, txRateBtnStyle: txRateMode?onStyle:offStyle, countBtnStyle: (!share&&!rateMode&&!txRateMode)?onStyle:offStyle,
       setShare:this.setShare, setRate:this.setRate, setTxRate:this.setTxRate, setCount:this.setCount, toggleQwen:this.toggleQwen, showQwen:st.showQwen,
       clearSel:this.clearSel, clearLabel:(st.selFam)?'clear':'',

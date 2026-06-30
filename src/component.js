@@ -60,7 +60,7 @@ class Component extends DCLogic {
   renderVals(){
     const h=React.createElement;
     const T=window.TAXO;
-    if(!T) return { ready:false, hasSel:false, legend:[], benchGroups:[], flowChart:null, flowTitle:'Composition by stage', statQuotes:'', statResponses:'', statBenchmarks:'', detRows:[], detBench:[], detQuotes:[], stageChips:[], tipShow:false, flowMin:440, benchDescShow:false, benchDescTag:'', benchDescText:'', benchDescUrl:'', detClass:[], veaSplit:[], accBands:[], accThrChips:[], accReady:false, eaSub:'', veaColLbl:'', mgColLbl:'', veaSwatch:'#7A3E9A', mgSwatch:'#2C6E63', modelGroupChips:[], showAllFams:this.showAllFams, anyHidden:false, txOpen:false, txModel:'', txFamily:'', txEval:'', txSid:'', txQuote:'', txParts:[], closeTx:this.closeTx, onFlowMove:this.onFlowMove, onFlowLeave:this.onFlowLeave };
+    if(!T) return { ready:false, hasSel:false, legend:[], benchGroups:[], flowChart:null, flowTitle:'Composition by stage', statQuotes:'', statResponses:'', statBenchmarks:'', detRows:[], detBench:[], detQuotes:[], stageChips:[], tipShow:false, flowMin:440, benchDescShow:false, benchDescTag:'', benchDescText:'', benchDescUrl:'', detClass:[], veaSplit:[], accBands:[], accThrChips:[], accReady:false, eaSub:'', veaColLbl:'', mgColLbl:'', veaSwatch:'#7A3E9A', mgSwatch:'#2C6E63', modelGroupChips:[], showAllFams:this.showAllFams, anyHidden:false, txOpen:false, txModel:'', txFamily:'', txEval:'', txSid:'', txQuote:'', txOrig:'', txHasOrig:false, txParts:[], closeTx:this.closeTx, onFlowMove:this.onFlowMove, onFlowLeave:this.onFlowLeave };
     const st=this.state, P=this.props||{};
     const measure = st.measure || P.defaultMeasure || 'rate';
     const share = measure==='share';
@@ -451,7 +451,7 @@ class Component extends DCLogic {
     const eaSub = scopeShort + (anyHidden ? ' · '+order.length+'/'+legendOrder.length+' families' : '');
 
     // ---------- source-transcript modal (quote -> transcript click) ----------
-    let txOpen=false, txModel='', txFamily='', txEval='', txSid='', txQuote='', txParts=[];
+    let txOpen=false, txModel='', txFamily='', txEval='', txSid='', txQuote='', txOrig='', txHasOrig=false, txParts=[];
     if(st.openTx && T.transcripts && (st.openTx in T.transcripts)){
       txOpen=true;
       const full=T.transcripts[st.openTx]||'';
@@ -459,6 +459,9 @@ class Component extends DCLogic {
       const pp=st.openTx.split('::'), mdl=pp[0], evk=pp[1], sid=pp.slice(2).join('::');
       const stg=(T.stages||[]).find(s=>s.model===mdl), evo=(T.evals||[]).find(e=>e.key===evk);
       txModel=stg?stg.label:mdl; txEval=evo?evo.label:evk; txSid=sid; txFamily=st.openTxFam||'';
+      // header shows BOTH the cleaned/clustering phrase and the verbatim original;
+      // only surface the original box when it actually differs from the cleaned form.
+      txOrig=st.openTxOrig||''; txHasOrig = !!txOrig && txOrig!==txQuote;
       // best-effort highlight using the VERBATIM quote (openTxOrig); fall back to the
       // cleaned display text, then to a 40-char prefix probe.
       const hl='background:#FFF1A8;color:#23231F;font-weight:600;border-radius:2px';
@@ -485,7 +488,7 @@ class Component extends DCLogic {
       clearBtnStyle:'font-family:\'Spline Sans Mono\',monospace;font-size:9.5px;color:#2C6E63;background:none;border:none;cursor:pointer;padding:0;'+(st.selFam?'':'visibility:hidden'),
       hasSel:!!selFamObj,
       selName, selKicker, selColor, detRows, detClass, detBench, detQuotes, quoteCount, moreQuotes, stageChips,
-      txOpen, txModel, txFamily, txEval, txSid, txQuote, txParts, closeTx:this.closeTx,
+      txOpen, txModel, txFamily, txEval, txSid, txQuote, txOrig, txHasOrig, txParts, closeTx:this.closeTx,
       tipShow, tipX, tipY, tipTransform, tipColor, tipLabel, tipLine1, tipLine2,
       onFlowMove:this.onFlowMove, onFlowLeave:this.onFlowLeave
     };

@@ -170,21 +170,29 @@ html,body{margin:0;height:100%;background:#F6F5F2}
       </div>
       <div style="font-family:'Spline Sans Mono',monospace;font-size:9.5px;line-height:1.5;color:#A6A49D;margin-bottom:20px">{{ measureHint }}</div>
 
-      <label style="display:flex;align-items:center;gap:9px;font-family:'Spline Sans Mono',monospace;font-size:11.5px;color:#3F3E3A;cursor:pointer;margin-bottom:22px;user-select:none">
-        <input type="checkbox" checked="{{ showQwen }}" onchange="{{ toggleQwen }}" style="accent-color:#2C6E63;width:14px;height:14px">
-        Show Qwen3-32B reference
-      </label>
+      <div style="font-family:'Spline Sans Mono',monospace;font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;color:#93918B;margin-bottom:9px">Models</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:22px">
+        <sc-for list="{{ modelGroupChips }}" as="g" hint-placeholder-count="3">
+          <button onclick="{{ g.onClick }}" style="{{ g.style }}">{{ g.label }}</button>
+        </sc-for>
+      </div>
 
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
         <span style="font-family:'Spline Sans Mono',monospace;font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;color:#93918B">Families</span>
-        <button onclick="{{ clearSel }}" style="{{ clearBtnStyle }}">{{ clearLabel }}</button>
+        <span style="display:flex;gap:10px;align-items:center">
+          <sc-if value="{{ anyHidden }}"><button onclick="{{ showAllFams }}" style="font-family:'Spline Sans Mono',monospace;font-size:9.5px;color:#2C6E63;background:none;border:none;cursor:pointer;padding:0">show all</button></sc-if>
+          <button onclick="{{ clearSel }}" style="{{ clearBtnStyle }}">{{ clearLabel }}</button>
+        </span>
       </div>
       <div style="display:flex;flex-direction:column;gap:2px">
         <sc-for list="{{ legend }}" as="f" hint-placeholder-count="8">
-          <div class="lg-row" onclick="{{ f.onClick }}" style="{{ f.rowStyle }}">
+          <div class="lg-row" style="{{ f.rowStyle }}">
             <div style="display:flex;align-items:center;gap:9px">
-              <span style="flex:none;width:13px;height:13px;border-radius:3px;background:{{ f.color }}"></span>
-              <span style="flex:1;min-width:0;font-size:13px;font-weight:600;line-height:1.25;color:#23231F;text-wrap:pretty">{{ f.label }}</span>
+              <input type="checkbox" checked="{{ f.checked }}" onchange="{{ f.onToggle }}" title="include this family in the view" style="flex:none;accent-color:{{ f.color }};width:13px;height:13px;cursor:pointer">
+              <span onclick="{{ f.onClick }}" style="flex:1;min-width:0;display:flex;align-items:center;gap:8px;cursor:pointer">
+                <span style="flex:none;width:11px;height:11px;border-radius:3px;background:{{ f.color }}"></span>
+                <span style="flex:1;min-width:0;font-size:13px;font-weight:600;line-height:1.25;color:#23231F;text-wrap:pretty">{{ f.label }}</span>
+              </span>
               <span style="flex:none;font-family:'Spline Sans Mono',monospace;font-size:11px;color:#8A8780">{{ f.total }}</span>
             </div>
             <div style="display:flex;align-items:flex-end;gap:3px;height:18px;padding-left:22px">
@@ -195,7 +203,7 @@ html,body{margin:0;height:100%;background:#F6F5F2}
           </div>
         </sc-for>
       </div>
-      <div style="font-family:'Spline Sans Mono',monospace;font-size:9px;line-height:1.5;color:#B7B5AE;margin-top:14px">Sparkline = each family's rate trajectory Base→RLVR (to its own peak), within the active benchmark scope. Click a family to inspect.</div>
+      <div style="font-family:'Spline Sans Mono',monospace;font-size:9px;line-height:1.5;color:#B7B5AE;margin-top:14px">Models: switch the visible columns between the full set, the OLMo lineage, and reference models. Checkboxes include/exclude each family across the whole view. Sparkline = each family's rate trajectory across the lineage (to its own peak), within the active scope. Click a family name to inspect.</div>
     </aside>
 
     <main class="rail-scroll" style="flex:1;min-width:0;overflow-y:auto;display:flex;flex-direction:column;gap:12px;padding:14px 18px 18px;background:#F6F5F2">
@@ -267,7 +275,7 @@ html,body{margin:0;height:100%;background:#F6F5F2}
           </span>
         </div>
         <div style="display:flex;flex-direction:column;gap:7px">
-          <sc-for list="{{ veaSplit }}" as="r" hint-placeholder-count="5">
+          <sc-for list="{{ veaSplit }}" as="r" hint-placeholder-count="8">
             <div style="display:grid;grid-template-columns:46px 1fr 158px;align-items:center;gap:9px">
               <span style="font-family:'Spline Sans Mono',monospace;font-size:10.5px;font-weight:500;color:{{ r.lblColor }}">{{ r.label }}</span>
               <span title="{{ r.title }}" style="display:flex;height:11px;background:#ECEAE4;border-radius:3px;overflow:hidden">
@@ -290,7 +298,7 @@ html,body{margin:0;height:100%;background:#F6F5F2}
               </span>
             </div>
             <div style="display:flex;flex-direction:column;gap:7px">
-              <sc-for list="{{ accBands }}" as="r" hint-placeholder-count="5">
+              <sc-for list="{{ accBands }}" as="r" hint-placeholder-count="8">
                 <div style="display:grid;grid-template-columns:46px 1fr 150px;align-items:center;gap:9px">
                   <span style="font-family:'Spline Sans Mono',monospace;font-size:10.5px;font-weight:500;color:{{ r.lblColor }}">{{ r.label }}</span>
                   <span style="display:flex;height:11px;background:#ECEAE4;border-radius:3px;overflow:hidden">
@@ -318,7 +326,7 @@ html,body{margin:0;height:100%;background:#F6F5F2}
 
         <div style="font-family:'Spline Sans Mono',monospace;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:#93918B;margin-bottom:9px">Per stage <span style="text-transform:none;letter-spacing:0;color:#C2BEB4">· {{ scopeShort }}</span></div>
         <div style="display:flex;flex-direction:column;gap:7px;margin-bottom:22px">
-          <sc-for list="{{ detRows }}" as="r" hint-placeholder-count="5">
+          <sc-for list="{{ detRows }}" as="r" hint-placeholder-count="8">
             <div style="display:grid;grid-template-columns:40px 1fr 54px;align-items:center;gap:9px">
               <span style="font-family:'Spline Sans Mono',monospace;font-size:10.5px;font-weight:500;color:{{ r.lblColor }}">{{ r.label }}</span>
               <span style="height:9px;background:#ECEAE4;border-radius:3px;overflow:hidden;position:relative"><i style="display:block;height:100%;width:{{ r.barW }};background:{{ selColor }};border-radius:3px;{{ r.barDash }}"></i></span>
@@ -336,7 +344,7 @@ html,body{margin:0;height:100%;background:#F6F5F2}
           </span>
         </div>
         <div style="display:flex;flex-direction:column;gap:7px;margin-bottom:22px">
-          <sc-for list="{{ detClass }}" as="r" hint-placeholder-count="5">
+          <sc-for list="{{ detClass }}" as="r" hint-placeholder-count="8">
             <div style="display:grid;grid-template-columns:40px 1fr 30px;align-items:center;gap:9px">
               <span style="font-family:'Spline Sans Mono',monospace;font-size:10.5px;font-weight:500;color:{{ r.lblColor }}">{{ r.label }}</span>
               <span style="display:flex;height:9px;background:#ECEAE4;border-radius:3px;overflow:hidden">
@@ -365,21 +373,22 @@ html,body{margin:0;height:100%;background:#F6F5F2}
           <span style="font-family:'Spline Sans Mono',monospace;font-size:9.5px;color:#B7B5AE">{{ quoteCount }}</span>
         </div>
         <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:11px">
-          <sc-for list="{{ stageChips }}" as="s" hint-placeholder-count="6">
+          <sc-for list="{{ stageChips }}" as="s" hint-placeholder-count="9">
             <button onclick="{{ s.onClick }}" style="{{ s.style }}">{{ s.label }}</button>
           </sc-for>
         </div>
         <div style="display:flex;flex-direction:column;gap:8px">
           <sc-for list="{{ detQuotes }}" as="q" hint-placeholder-count="6">
-            <div style="border:1px solid #E8E6E0;border-radius:7px;padding:9px 10px;background:#FFFFFF">
+            <div class="q-row" onclick="{{ q.onClick }}" style="border:1px solid #E8E6E0;border-radius:7px;padding:9px 10px;background:#FFFFFF;cursor:{{ q.rowCursor }}">
               <div style="font-size:12px;line-height:1.45;color:#2A2A27">“{{ q.t }}”</div>
-              <div style="display:flex;align-items:center;gap:6px;margin-top:7px;flex-wrap:wrap">
+              <div style="display:flex;align-items:center;gap:8px;margin-top:7px;flex-wrap:wrap">
                 <span style="flex:none;display:flex;align-items:center;gap:3px">
                   <sc-for list="{{ q.badges }}" as="b" hint-placeholder-count="2">
                     <span style="{{ b.style }}">{{ b.label }}</span>
                   </sc-for>
                 </span>
-                <span style="font-family:'Spline Sans Mono',monospace;font-size:9px;color:#A6A49D;margin-left:auto">{{ q.evLabel }}</span>
+                <span style="font-family:'Spline Sans Mono',monospace;font-size:9px;color:#5C8A7E;margin-left:auto;font-weight:600">{{ q.txHint }}</span>
+                <span style="font-family:'Spline Sans Mono',monospace;font-size:9px;color:#A6A49D">{{ q.evLabel }}</span>
               </div>
             </div>
           </sc-for>
@@ -390,4 +399,26 @@ html,body{margin:0;height:100%;background:#F6F5F2}
 
   </div>
 </div>
+
+<sc-if value="{{ txOpen }}">
+  <div style="position:fixed;inset:0;background:rgba(24,24,21,0.55);z-index:1000;display:flex;align-items:center;justify-content:center;padding:28px">
+    <div style="background:#FFFFFF;border-radius:12px;max-width:900px;width:100%;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 24px 70px rgba(0,0,0,0.34);overflow:hidden">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:15px 20px;border-bottom:1px solid #ECEAE4">
+        <div>
+          <div style="font-family:'Spline Sans',sans-serif;font-size:14px;font-weight:600;color:#23231F">Source transcript</div>
+          <div style="font-family:'Spline Sans Mono',monospace;font-size:11px;color:#8A8780;margin-top:3px">{{ txTitle }}</div>
+        </div>
+        <button onclick="{{ closeTx }}" style="flex:none;font-family:'Spline Sans Mono',monospace;font-size:11.5px;cursor:pointer;border:1px solid #DCD9D2;background:#F6F5F2;border-radius:6px;padding:6px 13px;color:#54534E">✕ close</button>
+      </div>
+      <div style="padding:13px 20px;border-bottom:1px solid #ECEAE4;background:#FBFAF7">
+        <div style="font-family:'Spline Sans Mono',monospace;font-size:8.5px;letter-spacing:.15em;text-transform:uppercase;color:#93918B;margin-bottom:5px">Extracted metagaming quote</div>
+        <div style="font-family:'Spline Sans',sans-serif;font-size:13px;line-height:1.5;color:#3A2A45;background:#F0E6F7;border-left:3px solid #7A3E9A;padding:8px 11px;border-radius:4px">“{{ txQuote }}”</div>
+      </div>
+      <div style="overflow-y:auto;padding:15px 20px">
+        <div style="font-family:'Spline Sans Mono',monospace;font-size:8.5px;letter-spacing:.15em;text-transform:uppercase;color:#93918B;margin-bottom:9px">Full transcript &mdash; the highlighted span is the quote in context</div>
+        <div style="font-family:'Spline Sans Mono',monospace;font-size:11.5px;line-height:1.65;color:#33332E;white-space:pre-wrap;word-break:break-word"><sc-for list="{{ txParts }}" as="p" hint-placeholder-count="3"><span style="{{ p.style }}">{{ p.text }}</span></sc-for></div>
+      </div>
+    </div>
+  </div>
+</sc-if>
 </x-dc>

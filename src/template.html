@@ -154,11 +154,6 @@ html,body{margin:0;height:100%;background:#F6F5F2}
     </div>
   </header>
 
-  <div style="flex:none;display:flex;align-items:center;gap:12px;padding:8px 24px;background:#FBF3E6;border-bottom:1px solid #EFE3CC;font-family:'Spline Sans Mono',monospace;font-size:11px;color:#7A5A1E">
-    <span style="flex:none;font-weight:600;letter-spacing:.04em;text-transform:uppercase;font-size:9.5px;background:#E8A93B;color:#3A2A06;padding:2px 7px;border-radius:3px">Read with care</span>
-    <span style="line-height:1.45"><b>Base was decoded at temperature&nbsp;0, every later stage at temperature&nbsp;1.</b> <b>Rate</b> = metagaming quotes per transcript, i.e. quotes ÷ transcripts fed to the extractor; one transcript can yield several quotes, so the rate can exceed 1. <b>All benchmarks</b> pools benchmarks with different denominators — filter to one class or benchmark for a clean rate. Qwen3-32B is an off-lineage reference.</span>
-  </div>
-
   <div style="flex:1;min-height:0;display:flex">
 
     <aside class="rail-scroll" style="flex:none;width:244px;border-right:1px solid #E4E2DC;background:#FBFAF8;overflow-y:auto;padding:18px 16px 28px">
@@ -406,7 +401,12 @@ html,body{margin:0;height:100%;background:#F6F5F2}
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:15px 20px;border-bottom:1px solid #ECEAE4">
         <div>
           <div style="font-family:'Spline Sans',sans-serif;font-size:14px;font-weight:600;color:#23231F">Source transcript</div>
-          <div style="font-family:'Spline Sans Mono',monospace;font-size:11px;color:#8A8780;margin-top:3px">{{ txTitle }}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:5px 14px;margin-top:6px;font-family:'Spline Sans Mono',monospace;font-size:11px">
+            <span><span style="color:#A6A49D">model</span> <b style="color:#2A2A27">{{ txModel }}</b></span>
+            <span><span style="color:#A6A49D">family</span> <b style="color:#2A2A27">{{ txFamily }}</b></span>
+            <span><span style="color:#A6A49D">benchmark</span> <b style="color:#2A2A27">{{ txEval }}</b></span>
+            <span style="color:#8A8780">sample {{ txSid }}</span>
+          </div>
         </div>
         <button onclick="{{ closeTx }}" style="flex:none;font-family:'Spline Sans Mono',monospace;font-size:11.5px;cursor:pointer;border:1px solid #DCD9D2;background:#F6F5F2;border-radius:6px;padding:6px 13px;color:#54534E">✕ close</button>
       </div>

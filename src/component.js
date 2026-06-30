@@ -1,6 +1,6 @@
 
 class Component extends DCLogic {
-  state = { measure:null, modelGroup:'all', hiddenFams:{}, selFam:null, qStage:'all', scope:'all', accThr:70, openTx:null, openTxQuote:'', openTxOrig:'', hover:null, hx:0, hy:0, hw:0, hh:0 };
+  state = { measure:null, modelGroup:'all', hiddenFams:{}, selFam:null, qStage:'all', scope:'all', accThr:70, openTx:null, openTxQuote:'', openTxOrig:'', openTxFam:'', hover:null, hx:0, hy:0, hw:0, hh:0 };
 
   componentDidMount(){ this._tick(0); }
   _tick(n){ if(window.TAXO){ this.forceUpdate(); } else if(n<80){ setTimeout(()=>this._tick(n+1),40); } }
@@ -18,8 +18,8 @@ class Component extends DCLogic {
   setScope=(v)=>this.setState(s=>({scope:s.scope===v?'all':v}));
   allBench=()=>this.setState({scope:'all'});
   setAccThr=(t)=>this.setState({accThr:t});
-  showTx=(tk,qt,oq)=>this.setState({openTx:tk, openTxQuote:qt||'', openTxOrig:oq||qt||''});
-  closeTx=()=>this.setState({openTx:null, openTxQuote:'', openTxOrig:''});
+  showTx=(tk,qt,oq,fam)=>this.setState({openTx:tk, openTxQuote:qt||'', openTxOrig:oq||qt||'', openTxFam:fam||''});
+  closeTx=()=>this.setState({openTx:null, openTxQuote:'', openTxOrig:'', openTxFam:''});
   onFlowMove=(e)=>{ const r=e.currentTarget.getBoundingClientRect(); this.setState({hx:e.clientX-r.left, hy:e.clientY-r.top, hw:r.width, hh:r.height}); };
   onFlowLeave=()=>this.setState({hover:null});
 
@@ -60,7 +60,7 @@ class Component extends DCLogic {
   renderVals(){
     const h=React.createElement;
     const T=window.TAXO;
-    if(!T) return { ready:false, hasSel:false, legend:[], benchGroups:[], flowChart:null, flowTitle:'Composition by stage', statQuotes:'', statResponses:'', statBenchmarks:'', detRows:[], detBench:[], detQuotes:[], stageChips:[], tipShow:false, flowMin:440, benchDescShow:false, benchDescTag:'', benchDescText:'', benchDescUrl:'', detClass:[], veaSplit:[], accBands:[], accThrChips:[], accReady:false, eaSub:'', veaColLbl:'', mgColLbl:'', veaSwatch:'#7A3E9A', mgSwatch:'#2C6E63', modelGroupChips:[], showAllFams:this.showAllFams, anyHidden:false, txOpen:false, txTitle:'', txQuote:'', txParts:[], closeTx:this.closeTx, onFlowMove:this.onFlowMove, onFlowLeave:this.onFlowLeave };
+    if(!T) return { ready:false, hasSel:false, legend:[], benchGroups:[], flowChart:null, flowTitle:'Composition by stage', statQuotes:'', statResponses:'', statBenchmarks:'', detRows:[], detBench:[], detQuotes:[], stageChips:[], tipShow:false, flowMin:440, benchDescShow:false, benchDescTag:'', benchDescText:'', benchDescUrl:'', detClass:[], veaSplit:[], accBands:[], accThrChips:[], accReady:false, eaSub:'', veaColLbl:'', mgColLbl:'', veaSwatch:'#7A3E9A', mgSwatch:'#2C6E63', modelGroupChips:[], showAllFams:this.showAllFams, anyHidden:false, txOpen:false, txModel:'', txFamily:'', txEval:'', txSid:'', txQuote:'', txParts:[], closeTx:this.closeTx, onFlowMove:this.onFlowMove, onFlowLeave:this.onFlowLeave };
     const st=this.state, P=this.props||{};
     const measure = st.measure || P.defaultMeasure || 'rate';
     const share = measure==='share';
@@ -376,7 +376,7 @@ class Component extends DCLogic {
         const tx=hasTx(q.tk);
         return { t:q.t, evLabel: elabel(ev0)+(showEv.length>1?' +'+(showEv.length-1):''), catColor:T.catColor[q.c]||'#999',
           badges, hasTx:tx, txHint: tx?'view transcript ↗':'',
-          onClick: tx?(()=>this.showTx(q.tk,q.t,q.oq||q.t)):(()=>{}),
+          onClick: tx?(()=>this.showTx(q.tk,q.t,q.oq||q.t,selFamObj.label)):(()=>{}),
           rowCursor: tx?'pointer':'default' }; });
       moreQuotes = filt.length>16 ? ('+ '+(filt.length-16)+' more (of '+filt.length+' sampled)') : '';
       quoteCount = filt.length+' shown'+(st.qStage==='all'?'':' · '+COLLBL[st.qStage]);
@@ -451,14 +451,14 @@ class Component extends DCLogic {
     const eaSub = scopeShort + (anyHidden ? ' · '+order.length+'/'+legendOrder.length+' families' : '');
 
     // ---------- source-transcript modal (quote -> transcript click) ----------
-    let txOpen=false, txTitle='', txQuote='', txParts=[];
+    let txOpen=false, txModel='', txFamily='', txEval='', txSid='', txQuote='', txParts=[];
     if(st.openTx && T.transcripts && (st.openTx in T.transcripts)){
       txOpen=true;
       const full=T.transcripts[st.openTx]||'';
       txQuote=st.openTxQuote||'';
       const pp=st.openTx.split('::'), mdl=pp[0], evk=pp[1], sid=pp.slice(2).join('::');
       const stg=(T.stages||[]).find(s=>s.model===mdl), evo=(T.evals||[]).find(e=>e.key===evk);
-      txTitle=(stg?stg.label:mdl)+'  ·  '+(evo?evo.label:evk)+'  ·  sample '+sid;
+      txModel=stg?stg.label:mdl; txEval=evo?evo.label:evk; txSid=sid; txFamily=st.openTxFam||'';
       // best-effort highlight using the VERBATIM quote (openTxOrig); fall back to the
       // cleaned display text, then to a 40-char prefix probe.
       const hl='background:#FFF1A8;color:#23231F;font-weight:600;border-radius:2px';
@@ -485,7 +485,7 @@ class Component extends DCLogic {
       clearBtnStyle:'font-family:\'Spline Sans Mono\',monospace;font-size:9.5px;color:#2C6E63;background:none;border:none;cursor:pointer;padding:0;'+(st.selFam?'':'visibility:hidden'),
       hasSel:!!selFamObj,
       selName, selKicker, selColor, detRows, detClass, detBench, detQuotes, quoteCount, moreQuotes, stageChips,
-      txOpen, txTitle, txQuote, txParts, closeTx:this.closeTx,
+      txOpen, txModel, txFamily, txEval, txSid, txQuote, txParts, closeTx:this.closeTx,
       tipShow, tipX, tipY, tipTransform, tipColor, tipLabel, tipLine1, tipLine2,
       onFlowMove:this.onFlowMove, onFlowLeave:this.onFlowLeave
     };

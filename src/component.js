@@ -1,6 +1,6 @@
 
 class Component extends DCLogic {
-  state = { measure:null, modelGroup:'all', hiddenFams:{}, selFam:null, qStage:'all', scope:'all', accThr:70, openTx:null, openTxQuote:'', openTxOrig:'', openTxFam:'', hover:null, hx:0, hy:0, hw:0, hh:0 };
+  state = { dataset:null, measure:null, modelGroup:'all', hiddenFams:{}, hiddenStages:{}, selFam:null, qStage:'all', scope:'all', accThr:70, openTx:null, openTxQuote:'', openTxOrig:'', openTxFam:'', openTxCw:'', hover:null, hx:0, hy:0, hw:0, hh:0 };
 
   componentDidMount(){ this._tick(0); }
   _tick(n){ if(window.TAXO){ this.forceUpdate(); } else if(n<80){ setTimeout(()=>this._tick(n+1),40); } }
@@ -10,16 +10,20 @@ class Component extends DCLogic {
   setCount=()=>this.setState({measure:'count'});
   setTxRate=()=>this.setState({measure:'txrate'});
   setModelGroup=(g)=>this.setState({modelGroup:g});
+  // switching lineage MUST reset all per-lineage UI state or the view mis-renders
+  setDataset=(id)=>this.setState({dataset:id, selFam:null, hiddenFams:{}, hiddenStages:{}, scope:'all', qStage:'all', modelGroup:'all', openTx:null, openTxQuote:'', openTxOrig:'', openTxFam:'', openTxCw:'', hover:null});
   toggleFam=(k)=>this.setState(s=>{ const h=Object.assign({},s.hiddenFams); if(h[k]) delete h[k]; else h[k]=true; return {hiddenFams:h}; });
   showAllFams=()=>this.setState({hiddenFams:{}});
+  toggleStage=(i)=>this.setState(s=>{ const h=Object.assign({},s.hiddenStages); if(h[i]) delete h[i]; else h[i]=true; return {hiddenStages:h}; });
+  showAllStages=()=>this.setState({hiddenStages:{}});
   pickFam=(k)=>this.setState(s=>({selFam:s.selFam===k?null:k, qStage:'all'}));
   clearSel=()=>this.setState({selFam:null});
   setQStage=(c)=>this.setState(s=>({qStage:s.qStage===c?'all':c}));
   setScope=(v)=>this.setState(s=>({scope:s.scope===v?'all':v}));
   allBench=()=>this.setState({scope:'all'});
   setAccThr=(t)=>this.setState({accThr:t});
-  showTx=(tk,qt,oq,fam)=>this.setState({openTx:tk, openTxQuote:qt||'', openTxOrig:oq||qt||'', openTxFam:fam||''});
-  closeTx=()=>this.setState({openTx:null, openTxQuote:'', openTxOrig:'', openTxFam:''});
+  showTx=(tk,qt,oq,fam,cw)=>this.setState({openTx:tk, openTxQuote:qt||'', openTxOrig:oq||qt||'', openTxFam:fam||'', openTxCw:cw||''});
+  closeTx=()=>this.setState({openTx:null, openTxQuote:'', openTxOrig:'', openTxFam:'', openTxCw:''});
   onFlowMove=(e)=>{ const r=e.currentTarget.getBoundingClientRect(); this.setState({hx:e.clientX-r.left, hy:e.clientY-r.top, hw:r.width, hh:r.height}); };
   onFlowLeave=()=>this.setState({hover:null});
 
@@ -59,8 +63,12 @@ class Component extends DCLogic {
 
   renderVals(){
     const h=React.createElement;
-    const T=window.TAXO;
-    if(!T) return { ready:false, hasSel:false, legend:[], benchGroups:[], flowChart:null, flowTitle:'Composition by stage', statQuotes:'', statResponses:'', statBenchmarks:'', detRows:[], detBench:[], detQuotes:[], stageChips:[], tipShow:false, flowMin:440, benchDescShow:false, benchDescTag:'', benchDescText:'', benchDescUrl:'', detClass:[], veaSplit:[], accBands:[], accThrChips:[], accReady:false, eaSub:'', veaColLbl:'', mgColLbl:'', veaSwatch:'#7A3E9A', mgSwatch:'#2C6E63', modelGroupChips:[], showAllFams:this.showAllFams, anyHidden:false, txOpen:false, txModel:'', txFamily:'', txEval:'', txSid:'', txQuote:'', txOrig:'', txHasOrig:false, txParts:[], closeTx:this.closeTx, onFlowMove:this.onFlowMove, onFlowLeave:this.onFlowLeave };
+    const TX=window.TAXO;
+    const isMulti=!!(TX && TX.schema===2 && TX.datasets);
+    const dsId=isMulti ? ((this.state.dataset && TX.datasets[this.state.dataset]) ? this.state.dataset : TX.default) : null;
+    const T=isMulti ? TX.datasets[dsId] : TX;
+    const LMETA=isMulti ? (TX.lineages[dsId]||{}) : {};
+    if(!T) return { ready:false, hasSel:false, legend:[], benchGroups:[], flowChart:null, flowTitle:'Composition by stage', statQuotes:'', statResponses:'', statBenchmarks:'', detRows:[], detBench:[], detQuotes:[], detImpls:[], stageChips:[], stageToggles:[], lineageOptions:[], lineageChips:[], lineageShow:false, lineageTitle:'', headerKicker:'Metagaming taxonomy', headerTitle:'', tipShow:false, flowMin:440, benchDescShow:false, benchDescTag:'', benchDescText:'', benchDescUrl:'', detClass:[], veaSplit:[], accBands:[], accThrChips:[], accReady:false, eaSub:'', veaColLbl:'', mgColLbl:'', veaSwatch:'#7A3E9A', mgSwatch:'#2C6E63', modelGroupChips:[], showAllFams:this.showAllFams, anyHidden:false, anyStageHidden:false, showAllStages:this.showAllStages, txOpen:false, txModel:'', txFamily:'', txEval:'', txSid:'', txQuote:'', txOrig:'', txHasOrig:false, txParts:[], closeTx:this.closeTx, onFlowMove:this.onFlowMove, onFlowLeave:this.onFlowLeave };
     const st=this.state, P=this.props||{};
     const measure = st.measure || P.defaultMeasure || 'rate';
     const share = measure==='share';
@@ -85,6 +93,9 @@ class Component extends DCLogic {
     const mg=st.modelGroup||'all';
     let cols = mg==='lineage'?LIN.slice() : mg==='reference'?REF.slice() : ALLC.slice();
     if(!cols.length) cols=ALLC.slice();
+    // per-stage checkboxes (schema 2): hide unchecked stages from every view
+    const stageFiltered = cols.filter(c=>!st.hiddenStages[c]);
+    if(stageFiltered.length) cols=stageFiltered;
     const lin=LIN.length?LIN:ALLC;
     // header provenance stats (dynamic, so they track the active run's data)
     const _nf=(x)=>x.toLocaleString('en-US');
@@ -291,8 +302,9 @@ class Component extends DCLogic {
       if(rateMode||txRateMode) fk.push(h('text',{key:'xs'+c,x:cxOf[c],y:baseY+55,textAnchor:'middle',style:{font:'10px "Spline Sans Mono",monospace',fill:'#B7B5AE'}}, SAMP[c]?(rateMode?(TOT[c]+' / '+SAMP[c]):('n='+SAMP[c]+' tx')):'')); });
     // ---------- x axis caption: Olmo 3 post-training lineage ----------
     if(linVis.length>=2){ const xb0=cxOf[linVis[0]]-barW/2, xb3=cxOf[linVis[linVis.length-1]]+barW/2, yb=baseY+68, xmid=(cxOf[linVis[0]]+cxOf[linVis[linVis.length-1]])/2;
+      const axisCap=(LMETA.axisCaption||'OLMo 3 post-training checkpoints').toUpperCase();
       fk.push(h('path',{key:'xbr',d:`M${xb0},${yb-5} L${xb0},${yb} L${xb3},${yb} L${xb3},${yb-5}`,fill:'none',stroke:'#D4D1CA',strokeWidth:1}));
-      fk.push(h('text',{key:'xbt',x:xmid,y:yb+15,textAnchor:'middle',style:{font:'600 10.5px "Spline Sans Mono",monospace',fill:'#7A7872',letterSpacing:'.12em'}},'OLMO 3 POST-TRAINING CHECKPOINTS')); }
+      fk.push(h('text',{key:'xbt',x:xmid,y:yb+15,textAnchor:'middle',style:{font:'600 10.5px "Spline Sans Mono",monospace',fill:'#7A7872',letterSpacing:'.12em'}},axisCap)); }
     // ---------- y axis ----------
     const axisMax = share?1: rateMode?AXR_EW: txRateMode?AXR_TXFAM: AXT;
     const yOf = (v)=> baseY - (axisMax ? (v/axisMax)*ph : 0);
@@ -331,7 +343,7 @@ class Component extends DCLogic {
 
     // ---------- detail panel ----------
     const selFamObj = st.selFam ? T.families.find(f=>f.key===st.selFam) : null;
-    let detRows=[], detBench=[], detQuotes=[], stageChips=[], detClass=[], selName='', selKicker='', selColor='#888', quoteCount='', moreQuotes='';
+    let detRows=[], detBench=[], detQuotes=[], stageChips=[], detClass=[], detImpls=[], selName='', selKicker='', selColor='#888', quoteCount='', moreQuotes='';
     if(selFamObj){
       selColor=col(selFamObj.key);
       selName=selFamObj.label;
@@ -353,6 +365,12 @@ class Component extends DCLogic {
         const tt=by.capability+by.safety+by.natural;
         return { label:COLLBL[c], total:tt, lblColor:STAGES[c].is_reference?'#A6A49D':'#46453F',
           segs:T.catOrder.filter(cl=>by[cl]>0).map(cl=>({ w:(by[cl]/tt*100).toFixed(2)+'%', color:this.CAT[cl], lbl:(T.catLabel[cl]||cl)+': '+by[cl] })) }; });
+      // implication breakdown (schema 2): the open discovery axis inside this entity.
+      // counts are per stage; show totals over the VISIBLE columns so stage checkboxes compose.
+      const impls=(selFamObj.implications||[]).map(im=>{ const n=cols.reduce((s,c)=>s+((im.counts||[])[c]||0),0); return {im,n}; }).filter(x=>x.n>0).sort((a,b)=>b.n-a.n).slice(0,14);
+      const implMax=Math.max(...impls.map(x=>x.n),1);
+      detImpls=impls.map(({im,n})=>({ text:im.text, count:n, color:selColor,
+        barW:Math.max(4,(n/implMax)*90).toFixed(0)+'px' }));
       // benchmark mix for this family (lineage counts), all benchmarks regardless of scope
       const mix=T.evals.map(e=>{ const a=selFamObj.byEval[e.key]; const n=a?lin.reduce((s,c)=>s+(a[c]||0),0):0; return {e, n}; }).filter(x=>x.n>0).sort((a,b)=>b.n-a.n);
       const mixMax=Math.max(...mix.map(x=>x.n),1);
@@ -374,9 +392,9 @@ class Component extends DCLogic {
         const badges=q.cols.filter(c=>c<NS).map(c=>({ label:COLLBL[c], style:badgeStyle(c) }));
         if(q.vea==='eval_aware') badges.push({ label:(q.acc!=null?'VEA '+q.acc:'VEA'), style:veaBadgeStyle });
         const tx=hasTx(q.tk);
-        return { t:q.t, evLabel: elabel(ev0)+(showEv.length>1?' +'+(showEv.length-1):''), catColor:T.catColor[q.c]||'#999',
+        return { t:q.t, oq:q.oq||'', cw:q.cw||'', impl:q.impl||'', evLabel: elabel(ev0)+(showEv.length>1?' +'+(showEv.length-1):''), catColor:T.catColor[q.c]||'#999',
           badges, hasTx:tx, txHint: tx?'view transcript ↗':'',
-          onClick: tx?(()=>this.showTx(q.tk,q.t,q.oq||q.t,selFamObj.label)):(()=>{}),
+          onClick: tx?(()=>this.showTx(q.tk,q.t,q.oq||q.t,selFamObj.label,q.cw||'')):(()=>{}),
           rowCursor: tx?'pointer':'default' }; });
       moreQuotes = filt.length>16 ? ('+ '+(filt.length-16)+' more (of '+filt.length+' sampled)') : '';
       quoteCount = filt.length+' shown'+(st.qStage==='all'?'':' · '+COLLBL[st.qStage]);
@@ -398,12 +416,33 @@ class Component extends DCLogic {
 
     // ---------- model-group selector (the "set" dropdown, as a segmented control) ----------
     const GROUPS=[{k:'all',label:'All models'}];
-    if(LIN.length) GROUPS.push({k:'lineage',label:'OLMo lineage'});
+    if(LIN.length) GROUPS.push({k:'lineage',label:LMETA.groupLabel||'OLMo lineage'});
     if(REF.length) GROUPS.push({k:'reference',label:'Reference'});
     const modelGroupChips = GROUPS.map(g=>({ label:g.label, onClick:()=>this.setModelGroup(g.k),
       style: chipBase + ((st.modelGroup||'all')===g.k
         ? 'background:#2C6E63;color:#fff;border:1px solid #2C6E63;font-weight:600'
         : 'background:#FFFFFF;color:#54534E;border:1px solid #E0DDD5') }));
+
+    // ---------- lineage selector (schema 2) + per-stage checkboxes ----------
+    const lineageShow = isMulti && (TX.lineageOrder||[]).length>=1;
+    const lineageOptions = isMulti ? (TX.lineageOrder||[]).map(id=>({
+      value:id, label:(TX.lineages[id]||{}).label||id, selected:id===dsId })) : [];
+    const onLineageChange=(e)=>this.setDataset(e&&e.target?e.target.value:e);
+    const lineageTitle = isMulti ? (LMETA.title||'') : '';
+    const lineageChips = lineageOptions.map(o=>({ label:o.label,
+      onClick:()=>this.setDataset(o.value),
+      style: chipBase + (o.selected
+        ? 'background:#23231F;color:#fff;border:1px solid #23231F;font-weight:600'
+        : 'background:#FFFFFF;color:#54534E;border:1px solid #E0DDD5') }));
+    const headerKicker = 'Metagaming taxonomy · ' + (isMulti ? ((LMETA.label||dsId)+' lineage') : 'OLMo-3 post-training');
+    const headerTitle = lineageTitle || 'Does the taxonomy of metagaming verbalizations change across Olmo 3 post-training checkpoints?';
+    // stage checkboxes clone the family-checkbox mechanism; hiding a stage drops its
+    // column from the chart and every aggregate (cols is filtered above).
+    const mgBase = mg==='lineage'?LIN : mg==='reference'?REF : ALLC;
+    const stageToggles = mgBase.map(c=>({ label:COLLBL[c], checked:!st.hiddenStages[c],
+      onToggle:()=>this.toggleStage(c),
+      rowStyle:'display:flex;align-items:center;gap:5px;font-family:\'Spline Sans\',sans-serif;font-size:11px;color:'+(st.hiddenStages[c]?'#B7B5AE':'#33332E')+';cursor:pointer;white-space:nowrap' }));
+    const anyStageHidden = Object.keys(st.hiddenStages||{}).length>0;
 
     // ---------- Eval-awareness by model (Feature A: MG vs VEA split; Feature B: accuracy) ----------
     // Both recompute over (visible families x active evals), so the family checkboxes
@@ -451,7 +490,7 @@ class Component extends DCLogic {
     const eaSub = scopeShort + (anyHidden ? ' · '+order.length+'/'+legendOrder.length+' families' : '');
 
     // ---------- source-transcript modal (quote -> transcript click) ----------
-    let txOpen=false, txModel='', txFamily='', txEval='', txSid='', txQuote='', txOrig='', txHasOrig=false, txParts=[];
+    let txOpen=false, txModel='', txFamily='', txEval='', txSid='', txQuote='', txOrig='', txHasOrig=false, txParts=[], txCwParts=[], txHasCw=false;
     if(st.openTx && T.transcripts && (st.openTx in T.transcripts)){
       txOpen=true;
       const full=T.transcripts[st.openTx]||'';
@@ -471,6 +510,16 @@ class Component extends DCLogic {
       txParts = idx>=0
         ? [{text:full.slice(0,idx),style:''},{text:full.slice(idx,idx+qlen),style:hl},{text:full.slice(idx+qlen),style:''}]
         : [{text:full,style:''}];
+      // context window: highlight the original quote within the surrounding text
+      const cwRaw = st.openTxCw||'';
+      if(cwRaw){ txHasCw=true;
+        const cwNeedle=st.openTxOrig||txQuote;
+        let ci=cwNeedle?cwRaw.indexOf(cwNeedle):-1, clen=cwNeedle.length;
+        if(ci<0&&cwNeedle){ const p=cwNeedle.slice(0,40); if(p){ci=cwRaw.indexOf(p);clen=Math.min(cwNeedle.length,40);} }
+        txCwParts = ci>=0
+          ? [{text:cwRaw.slice(0,ci),style:''},{text:cwRaw.slice(ci,ci+clen),style:hl},{text:cwRaw.slice(ci+clen),style:''}]
+          : [{text:cwRaw,style:''}];
+      }
     }
 
     return {
@@ -487,8 +536,10 @@ class Component extends DCLogic {
       clearSel:this.clearSel, clearLabel:(st.selFam)?'clear':'',
       clearBtnStyle:'font-family:\'Spline Sans Mono\',monospace;font-size:9.5px;color:#2C6E63;background:none;border:none;cursor:pointer;padding:0;'+(st.selFam?'':'visibility:hidden'),
       hasSel:!!selFamObj,
-      selName, selKicker, selColor, detRows, detClass, detBench, detQuotes, quoteCount, moreQuotes, stageChips,
-      txOpen, txModel, txFamily, txEval, txSid, txQuote, txOrig, txHasOrig, txParts, closeTx:this.closeTx,
+      selName, selKicker, selColor, detRows, detClass, detBench, detImpls, detQuotes, quoteCount, moreQuotes, stageChips,
+      lineageShow, lineageOptions, lineageChips, onLineageChange, lineageTitle, headerKicker, headerTitle,
+      stageToggles, anyStageHidden, showAllStages:this.showAllStages,
+      txOpen, txModel, txFamily, txEval, txSid, txQuote, txOrig, txHasOrig, txParts, txHasCw, txCwParts, closeTx:this.closeTx,
       tipShow, tipX, tipY, tipTransform, tipColor, tipLabel, tipLine1, tipLine2,
       onFlowMove:this.onFlowMove, onFlowLeave:this.onFlowLeave
     };

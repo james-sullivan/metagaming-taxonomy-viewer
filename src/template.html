@@ -145,8 +145,16 @@ html,body{margin:0;height:100%;background:#F6F5F2}
 
   <header style="flex:none;display:flex;align-items:flex-end;justify-content:space-between;gap:24px;padding:14px 24px 13px;border-bottom:1px solid #E4E2DC;background:#FBFAF8">
     <div style="min-width:0">
-      <div style="font-family:'Spline Sans Mono',monospace;font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:#2C6E63;margin-bottom:5px">Metagaming taxonomy · OLMo-3 post-training</div>
-      <div style="font-size:19px;font-weight:600;letter-spacing:-.01em;line-height:1.1">Does the taxonomy of metagaming verbalizations change across Olmo 3 post-training checkpoints?</div>
+      <div style="font-family:'Spline Sans Mono',monospace;font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:#2C6E63;margin-bottom:5px">{{ headerKicker }}</div>
+      <div style="font-size:19px;font-weight:600;letter-spacing:-.01em;line-height:1.1">{{ headerTitle }}</div>
+      <sc-if value="{{ lineageShow }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap">
+          <span style="font-family:'Spline Sans Mono',monospace;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:#93918B">Lineage</span>
+          <sc-for list="{{ lineageChips }}" as="lc" hint-placeholder-count="4">
+            <button onclick="{{ lc.onClick }}" style="{{ lc.style }}">{{ lc.label }}</button>
+          </sc-for>
+        </div>
+      </sc-if>
     </div>
     <div style="flex:none;text-align:right;font-family:'Spline Sans Mono',monospace;font-size:10px;line-height:1.65;color:#5C5B57;white-space:nowrap">
       <div><span style="color:#A6A49D">verbalizations</span> {{ statQuotes }} quotes · {{ statResponses }} responses · {{ statBenchmarks }} benchmarks</div>
@@ -166,9 +174,21 @@ html,body{margin:0;height:100%;background:#F6F5F2}
       <div style="font-family:'Spline Sans Mono',monospace;font-size:9.5px;line-height:1.5;color:#A6A49D;margin-bottom:20px">{{ measureHint }}</div>
 
       <div style="font-family:'Spline Sans Mono',monospace;font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;color:#93918B;margin-bottom:9px">Models</div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:22px">
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
         <sc-for list="{{ modelGroupChips }}" as="g" hint-placeholder-count="3">
           <button onclick="{{ g.onClick }}" style="{{ g.style }}">{{ g.label }}</button>
+        </sc-for>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <span style="font-family:'Spline Sans Mono',monospace;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:#B7B5AE">Stages</span>
+        <sc-if value="{{ anyStageHidden }}" hint-placeholder-val="{{ false }}"><button onclick="{{ showAllStages }}" style="font-family:'Spline Sans Mono',monospace;font-size:9.5px;color:#2C6E63;background:none;border:none;cursor:pointer;padding:0">show all</button></sc-if>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:22px">
+        <sc-for list="{{ stageToggles }}" as="stg" hint-placeholder-count="4">
+          <label style="{{ stg.rowStyle }}">
+            <input type="checkbox" checked="{{ stg.checked }}" onchange="{{ stg.onToggle }}" title="include this stage's column in the view" style="flex:none;accent-color:#2C6E63;width:12px;height:12px;cursor:pointer">
+            <span>{{ stg.label }}</span>
+          </label>
         </sc-for>
       </div>
 
@@ -352,6 +372,19 @@ html,body{margin:0;height:100%;background:#F6F5F2}
           </sc-for>
         </div>
 
+        <sc-if value="{{ detImpls }}" hint-placeholder-val="{{ false }}">
+          <div style="font-family:'Spline Sans Mono',monospace;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:#93918B;margin-bottom:9px">Implications <span style="text-transform:none;letter-spacing:0;color:#C2BEB4">· what the model infers</span></div>
+          <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:22px">
+            <sc-for list="{{ detImpls }}" as="im" hint-placeholder-count="6">
+              <div style="display:flex;align-items:center;gap:8px;padding:3px 6px">
+                <span style="flex:1;min-width:0;font-size:11px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ im.text }}">{{ im.text }}</span>
+                <span style="flex:none;height:6px;width:{{ im.barW }};max-width:90px;background:{{ im.color }};opacity:.5;border-radius:3px"></span>
+                <span style="flex:none;font-family:'Spline Sans Mono',monospace;font-size:9.5px;color:#93918B;width:26px;text-align:right">{{ im.count }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+
         <div style="font-family:'Spline Sans Mono',monospace;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:#93918B;margin-bottom:9px">Benchmark mix <span style="text-transform:none;letter-spacing:0;color:#C2BEB4">· lineage</span></div>
         <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:22px">
           <sc-for list="{{ detBench }}" as="b" hint-placeholder-count="4">
@@ -373,17 +406,23 @@ html,body{margin:0;height:100%;background:#F6F5F2}
           </sc-for>
         </div>
         <div style="display:flex;flex-direction:column;gap:8px">
-          <sc-for list="{{ detQuotes }}" as="q" hint-placeholder-count="6">
-            <div class="q-row" onclick="{{ q.onClick }}" style="border:1px solid #E8E6E0;border-radius:7px;padding:9px 10px;background:#FFFFFF;cursor:{{ q.rowCursor }}">
-              <div style="font-size:12px;line-height:1.45;color:#2A2A27">“{{ q.t }}”</div>
-              <div style="display:flex;align-items:center;gap:8px;margin-top:7px;flex-wrap:wrap">
-                <span style="flex:none;display:flex;align-items:center;gap:3px">
-                  <sc-for list="{{ q.badges }}" as="b" hint-placeholder-count="2">
-                    <span style="{{ b.style }}">{{ b.label }}</span>
+          <sc-for list=”{{ detQuotes }}” as=”q” hint-placeholder-count=”6”>
+            <div class=”q-row” onclick=”{{ q.onClick }}” style=”border:1px solid #E8E6E0;border-radius:7px;padding:9px 10px;background:#FFFFFF;cursor:{{ q.rowCursor }}”>
+              <div style=”font-size:12px;line-height:1.45;color:#2A2A27”>”{{ q.t }}”</div>
+              <sc-if value="{{ q.impl }}" hint-placeholder-val="{{ false }}">
+                <div style="font-size:10.5px;line-height:1.4;color:#4E9B86;margin-top:4px;font-style:italic">&#8594; {{ q.impl }}</div>
+              </sc-if>
+              <sc-if value=”{{ q.cw }}” hint-placeholder-val=”{{ false }}”>
+                <div style=”font-family:'Spline Sans Mono',monospace;font-size:9.5px;line-height:1.5;color:#8A8780;margin-top:6px;padding:5px 7px;background:#F6F5F2;border-radius:4px;white-space:pre-wrap;word-break:break-word”>{{ q.cw }}</div>
+              </sc-if>
+              <div style=”display:flex;align-items:center;gap:8px;margin-top:7px;flex-wrap:wrap”>
+                <span style=”flex:none;display:flex;align-items:center;gap:3px”>
+                  <sc-for list=”{{ q.badges }}” as=”b” hint-placeholder-count=”2”>
+                    <span style=”{{ b.style }}”>{{ b.label }}</span>
                   </sc-for>
                 </span>
-                <span style="font-family:'Spline Sans Mono',monospace;font-size:9px;color:#5C8A7E;margin-left:auto;font-weight:600">{{ q.txHint }}</span>
-                <span style="font-family:'Spline Sans Mono',monospace;font-size:9px;color:#A6A49D">{{ q.evLabel }}</span>
+                <span style=”font-family:'Spline Sans Mono',monospace;font-size:9px;color:#5C8A7E;margin-left:auto;font-weight:600”>{{ q.txHint }}</span>
+                <span style=”font-family:'Spline Sans Mono',monospace;font-size:9px;color:#A6A49D”>{{ q.evLabel }}</span>
               </div>
             </div>
           </sc-for>
@@ -413,12 +452,16 @@ html,body{margin:0;height:100%;background:#F6F5F2}
       <div style="padding:13px 20px;border-bottom:1px solid #ECEAE4;background:#FBFAF7">
         <div style="font-family:'Spline Sans Mono',monospace;font-size:8.5px;letter-spacing:.15em;text-transform:uppercase;color:#93918B;margin-bottom:5px">Cleaned phrase &mdash; normalized form used for clustering</div>
         <div style="font-family:'Spline Sans',sans-serif;font-size:13px;line-height:1.5;color:#3A2A45;background:#F0E6F7;border-left:3px solid #7A3E9A;padding:8px 11px;border-radius:4px">“{{ txQuote }}”</div>
-        <sc-if value="{{ txHasOrig }}">
-          <div style="font-family:'Spline Sans Mono',monospace;font-size:8.5px;letter-spacing:.15em;text-transform:uppercase;color:#93918B;margin:11px 0 5px">Original quote &mdash; verbatim, highlighted in the transcript below</div>
-          <div style="font-family:'Spline Sans',sans-serif;font-size:13px;line-height:1.5;color:#5A4A12;background:#FBF3C9;border-left:3px solid #D4A017;padding:8px 11px;border-radius:4px">“{{ txOrig }}”</div>
+        <sc-if value=”{{ txHasOrig }}”>
+          <div style=”font-family:'Spline Sans Mono',monospace;font-size:8.5px;letter-spacing:.15em;text-transform:uppercase;color:#93918B;margin:11px 0 5px”>Original quote &mdash; verbatim, highlighted in the transcript below</div>
+          <div style=”font-family:'Spline Sans',sans-serif;font-size:13px;line-height:1.5;color:#5A4A12;background:#FBF3C9;border-left:3px solid #D4A017;padding:8px 11px;border-radius:4px”>”{{ txOrig }}”</div>
+        </sc-if>
+        <sc-if value=”{{ txHasCw }}” hint-placeholder-val=”{{ false }}”>
+          <div style=”font-family:'Spline Sans Mono',monospace;font-size:8.5px;letter-spacing:.15em;text-transform:uppercase;color:#93918B;margin:11px 0 5px”>Context window &mdash; surrounding text from transcript</div>
+          <div style=”font-family:'Spline Sans Mono',monospace;font-size:11px;line-height:1.6;color:#33332E;background:#F6F5F2;border-left:3px solid #C2BEB4;padding:8px 11px;border-radius:4px;white-space:pre-wrap;word-break:break-word”><sc-for list=”{{ txCwParts }}” as=”p” hint-placeholder-count=”3”><span style=”{{ p.style }}”>{{ p.text }}</span></sc-for></div>
         </sc-if>
       </div>
-      <div style="overflow-y:auto;padding:15px 20px">
+      <div style=”overflow-y:auto;padding:15px 20px”>
         <div style="font-family:'Spline Sans Mono',monospace;font-size:8.5px;letter-spacing:.15em;text-transform:uppercase;color:#93918B;margin-bottom:9px">Full transcript &mdash; the highlighted span is the quote in context</div>
         <div style="font-family:'Spline Sans Mono',monospace;font-size:11.5px;line-height:1.65;color:#33332E;white-space:pre-wrap;word-break:break-word"><sc-for list="{{ txParts }}" as="p" hint-placeholder-count="3"><span style="{{ p.style }}">{{ p.text }}</span></sc-for></div>
       </div>

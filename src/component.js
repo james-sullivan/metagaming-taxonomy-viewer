@@ -68,7 +68,7 @@ class Component extends DCLogic {
     const dsId=isMulti ? ((this.state.dataset && TX.datasets[this.state.dataset]) ? this.state.dataset : TX.default) : null;
     const T=isMulti ? TX.datasets[dsId] : TX;
     const LMETA=isMulti ? (TX.lineages[dsId]||{}) : {};
-    if(!T) return { ready:false, hasSel:false, legend:[], benchGroups:[], flowChart:null, flowTitle:'Composition by stage', statQuotes:'', statResponses:'', statBenchmarks:'', detRows:[], detBench:[], detQuotes:[], detImpls:[], stageChips:[], stageToggles:[], lineageOptions:[], lineageChips:[], lineageShow:false, lineageTitle:'', headerKicker:'Metagaming taxonomy', headerTitle:'', tipShow:false, flowMin:440, benchDescShow:false, benchDescTag:'', benchDescText:'', benchDescUrl:'', detClass:[], veaSplit:[], accBands:[], accThrChips:[], accReady:false, eaSub:'', veaColLbl:'', mgColLbl:'', veaSwatch:'#7A3E9A', mgSwatch:'#2C6E63', modelGroupChips:[], showAllFams:this.showAllFams, anyHidden:false, anyStageHidden:false, showAllStages:this.showAllStages, txOpen:false, txModel:'', txFamily:'', txEval:'', txSid:'', txQuote:'', txOrig:'', txHasOrig:false, txParts:[], closeTx:this.closeTx, onFlowMove:this.onFlowMove, onFlowLeave:this.onFlowLeave };
+    if(!T) return { ready:false, hasSel:false, legend:[], benchGroups:[], flowChart:null, flowTitle:'Composition by stage', statQuotes:'', statResponses:'', statBenchmarks:'', detRows:[], detBench:[], detQuotes:[], detImpls:[], stageChips:[], stageToggles:[], lineageOptions:[], lineageChips:[], lineageShow:false, headerKicker:'Metagaming taxonomy', headerTitle:'How does the taxonomy of metagaming verbalizations change across post-training?', tipShow:false, flowMin:440, benchDescShow:false, benchDescTag:'', benchDescText:'', benchDescUrl:'', detClass:[], veaSplit:[], accBands:[], accThrChips:[], accReady:false, eaSub:'', veaColLbl:'', mgColLbl:'', veaSwatch:'#7A3E9A', mgSwatch:'#2C6E63', modelGroupChips:[], showAllFams:this.showAllFams, anyHidden:false, anyStageHidden:false, showAllStages:this.showAllStages, txOpen:false, txModel:'', txFamily:'', txEval:'', txSid:'', txQuote:'', txOrig:'', txHasOrig:false, txParts:[], closeTx:this.closeTx, onFlowMove:this.onFlowMove, onFlowLeave:this.onFlowLeave };
     const st=this.state, P=this.props||{};
     const measure = st.measure || P.defaultMeasure || 'rate';
     const share = measure==='share';
@@ -428,14 +428,13 @@ class Component extends DCLogic {
     const lineageOptions = isMulti ? (TX.lineageOrder||[]).map(id=>({
       value:id, label:(TX.lineages[id]||{}).label||id, selected:id===dsId })) : [];
     const onLineageChange=(e)=>this.setDataset(e&&e.target?e.target.value:e);
-    const lineageTitle = isMulti ? (LMETA.title||'') : '';
     const lineageChips = lineageOptions.map(o=>({ label:o.label,
       onClick:()=>this.setDataset(o.value),
       style: chipBase + (o.selected
         ? 'background:#23231F;color:#fff;border:1px solid #23231F;font-weight:600'
         : 'background:#FFFFFF;color:#54534E;border:1px solid #E0DDD5') }));
-    const headerKicker = 'Metagaming taxonomy · ' + (isMulti ? ((LMETA.label||dsId)+' lineage') : 'OLMo-3 post-training');
-    const headerTitle = lineageTitle || 'Does the taxonomy of metagaming verbalizations change across Olmo 3 post-training checkpoints?';
+    const headerKicker = 'Metagaming taxonomy · ' + (isMulti ? ((LMETA.label||dsId)+' lineage') : 'post-training');
+    const headerTitle = 'How does the taxonomy of metagaming verbalizations change across post-training?';
     // stage checkboxes clone the family-checkbox mechanism; hiding a stage drops its
     // column from the chart and every aggregate (cols is filtered above).
     const mgBase = mg==='lineage'?LIN : mg==='reference'?REF : ALLC;
@@ -537,7 +536,7 @@ class Component extends DCLogic {
       clearBtnStyle:'font-family:\'Spline Sans Mono\',monospace;font-size:9.5px;color:#2C6E63;background:none;border:none;cursor:pointer;padding:0;'+(st.selFam?'':'visibility:hidden'),
       hasSel:!!selFamObj,
       selName, selKicker, selColor, detRows, detClass, detBench, detImpls, detQuotes, quoteCount, moreQuotes, stageChips,
-      lineageShow, lineageOptions, lineageChips, onLineageChange, lineageTitle, headerKicker, headerTitle,
+      lineageShow, lineageOptions, lineageChips, onLineageChange, headerKicker, headerTitle,
       stageToggles, anyStageHidden, showAllStages:this.showAllStages,
       txOpen, txModel, txFamily, txEval, txSid, txQuote, txOrig, txHasOrig, txParts, txHasCw, txCwParts, closeTx:this.closeTx,
       tipShow, tipX, tipY, tipTransform, tipColor, tipLabel, tipLine1, tipLine2,

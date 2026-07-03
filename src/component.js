@@ -57,6 +57,16 @@ function cp_encloseBasis3(a,b,c){var x1=a.x,y1=a.y,r1=a.r,x2=b.x,y2=b.y,r2=b.r,x
   A=xb*xb+yb*yb-1,B=2*(r1+xa*xb+ya*yb),C=xa*xa+ya*ya-r1*r1,
   r=-(Math.abs(A)>1e-6?(B+Math.sqrt(B*B-4*A*C))/(2*A):C/B);
   return{x:x1+xa+xb*r,y:y1+ya+yb*r,r:r};}
+// greedy word-wrap into <=maxLines lines of <=maxChars; ellipsize the last if it overflows.
+function cp_wrap(text,maxChars,maxLines){
+  var words=String(text).split(/\s+/).filter(Boolean),lines=[],cur='';
+  for(var i=0;i<words.length;i++){var w=words[i],t=cur?cur+' '+w:w;
+    if(t.length<=maxChars||!cur)cur=t;else{lines.push(cur);cur=w;}}
+  if(cur)lines.push(cur);
+  if(lines.length<=maxLines)return lines;
+  var kept=lines.slice(0,maxLines),last=kept[maxLines-1];
+  if(last.length>maxChars-1)last=last.slice(0,maxChars-1).replace(/\s+$/,'');
+  kept[maxLines-1]=last+'…';return kept;}
 
 class Component extends DCLogic {
   state = { dataset:null, measure:null, modelGroup:'all', hiddenFams:{}, hiddenStages:{}, selFam:null, qStage:'all', scope:'all', accThr:70, openTx:null, openTxQuote:'', openTxOrig:'', openTxFam:'', openTxCw:'', hover:null, hx:0, hy:0, hw:0, hh:0 };
@@ -431,10 +441,16 @@ class Component extends DCLogic {
               fill:rem?'#9E9C95':n.color,fillOpacity:dim?0.1:(rem?0.3:0.55),stroke:'#FBFAF8',strokeWidth:0.7,
               style:{cursor:'pointer'},onClick:()=>this.pickFam(n.key)},
               h('title',{key:'t'},rem?(n.label+' · other / unclustered — '+cc.data.val+' quotes'):(n.label+' · '+cc.data.text+' — '+cc.data.val+' quotes'))));
-            if(kr>=19 && !dim){ const fs=Math.min(12,Math.max(8.5,kr*0.32)), maxc=Math.max(3,Math.floor(kr/(fs*0.30))), lbl=rem?'other':cc.data.text;
-              els.push(h('text',{key:'kl'+n.key+ci,x:kx.toFixed(1),y:(ky+fs*0.34).toFixed(1),textAnchor:'middle',
-                style:{font:'600 '+fs.toFixed(1)+'px "Spline Sans",sans-serif',fill:rem?'#54534E':'#26261F',paintOrder:'stroke',stroke:'#FBFAF8',strokeWidth:'2.4px',pointerEvents:'none'}},
-                lbl.length>maxc?lbl.slice(0,maxc).trimEnd()+'…':lbl)); }
+            if(kr>=15 && !dim){
+              const raw=rem?'other':cc.data.text;
+              // drop the redundant leading type word ("User Expected Answer" -> "Expected Answer")
+              const lw=raw.split(/\s+/), lbl=(!rem && lw.length>1 && lw[0].toLowerCase()===n.label.toLowerCase())?lw.slice(1).join(' '):raw;
+              const fs=Math.min(13,Math.max(8,kr*0.26));
+              const cpl=Math.max(4,Math.floor(kr*1.5/(fs*0.53)));
+              const mxl=Math.max(1,Math.min(4,Math.floor(kr*1.55/(fs*1.12))));
+              const lines=cp_wrap(lbl,cpl,mxl), lh=fs*1.12, y0=ky-(lines.length-1)*lh/2+fs*0.34;
+              lines.forEach((ln,li)=> els.push(h('text',{key:'kl'+n.key+ci+'_'+li,x:kx.toFixed(1),y:(y0+li*lh).toFixed(1),textAnchor:'middle',
+                style:{font:'600 '+fs.toFixed(1)+'px "Spline Sans",sans-serif',fill:rem?'#54534E':'#26261F',paintOrder:'stroke',stroke:'#FBFAF8',strokeWidth:'2.2px',pointerEvents:'none'}},ln))); }
           });
           els.push(h('text',{key:'el'+n.key,x:ex.toFixed(1),y:(ey-eR+13).toFixed(1),textAnchor:'middle',
             style:{font:'700 13px "Spline Sans",sans-serif',fill:dim?'#B7B5AE':n.color,paintOrder:'stroke',stroke:'#F6F5F2',strokeWidth:'3px',pointerEvents:'none',cursor:'pointer'},onClick:()=>this.pickFam(n.key)},n.label));

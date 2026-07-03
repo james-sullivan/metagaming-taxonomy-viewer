@@ -392,73 +392,83 @@ class Component extends DCLogic {
     let flowSub = (share?'share of each stage’s verbalizations':rateMode?'metagaming quotes per transcript — height = rate':txRateMode?'% of transcripts with ≥1 quote in each family — one bar per family, not stacked':'absolute quote counts (height scaled to peak stage)') + ' · '+scopeShort;
     let flowTitle = txRateMode?'Transcript coverage by family':'Composition by stage';
 
-    // ---------- type / subtype circle packing (replaces the stacked flow) ----------
-    // Each visible meta-entity (metagaming TYPE) is a circle; inside it, one sub-circle per
-    // implication cluster (SUBTYPE). Circle AREA ∝ quote count over the VISIBLE stages
-    // (pooled across benchmarks). Packed with d3's algorithm; the type circle is the smallest
-    // circle enclosing its subtype circles. Respects the family + stage checkboxes. Falls back
-    // to the stacked flow only if no visible family has clustered implications.
+    // ---------- type / subtype circle packing, one pack PER STAGE (small multiples) --------
+    // Each visible lineage stage gets its own circle-pack, laid out left→right, so you read the
+    // composition CHANGE base→final. In each pack: circle = a metagaming TYPE, inner circles =
+    // implication SUBTYPES (named clusters + a muted "unclustered" remainder). Circle AREA ∝
+    // quotes AT THAT STAGE within the active benchmark scope, on a COMMON scale across stages so
+    // sizes are comparable along the lineage. N packs fill the panel width; responds to the
+    // benchmark filter via each implication's per-eval counts. Falls back to the stacked flow
+    // only if no visible family has clustered implications.
     {
-      const CW=1320, CH=560, GAPF=0.16, EM=0.05;
-      const nodes=[];
-      order.forEach(f=>{
-        const named=(f.implications||[])
-          .map(im=>({ text:im.text, val:cols.reduce((s,c)=>s+((im.counts||[])[c]||0),0) }))
-          .filter(k=>k.val>0).sort((a,b)=>b.val-a.val);
-        const entTot=cols.reduce((s,c)=>s+((f.counts||[])[c]||0),0);
-        // include every visible type: named subtype circles + one muted "unclustered"
-        // remainder circle (quotes whose implication never formed a named cluster), so a
-        // type with few/no named subtypes still appears, sized by its full quote count.
-        const rem=entTot-named.reduce((s,k)=>s+k.val,0);
-        const kids=named.slice();
-        if(rem>0.5) kids.push({ text:'other / unclustered', val:rem, remainder:true });
-        if(!kids.length) return;
-        const circ=kids.map(k=>({ r:Math.sqrt(k.val)*(1+GAPF), data:k }));
-        const R=cp_packEnclose(circ);
-        nodes.push({ key:f.key, label:f.label, color:col(f.key), total:entTot, circ, R });
-      });
-      if(nodes.length){
+      const CW=1320, CH=560, LABH=46, GAPF=0.16, EM=0.05;
+      // subtype value at stage si under the active benchmark scope (per-eval counts if filtered)
+      const subValAt=(im,si)=> (evals && im.byEval)
+        ? evals.reduce((a,e)=>a+(((im.byEval[e])||[])[si]||0),0)
+        : ((im.counts||[])[si]||0);
+      const packStage=(si)=>{
+        const nodes=[];
+        order.forEach(f=>{
+          const named=(f.implications||[]).map(im=>({ text:im.text, val:subValAt(im,si) }))
+            .filter(k=>k.val>0).sort((a,b)=>b.val-a.val);
+          const entTot=EFF[f.key][si]||0;                     // scope-aware type total at this stage
+          const rem=entTot-named.reduce((a,k)=>a+k.val,0);
+          const kids=named.slice();
+          if(rem>0.5) kids.push({ text:'other / unclustered', val:rem, remainder:true });
+          if(!kids.length) return;
+          const circ=kids.map(k=>({ r:Math.sqrt(k.val)*(1+GAPF), data:k }));
+          const R=cp_packEnclose(circ);
+          nodes.push({ key:f.key, label:f.label, color:col(f.key), total:entTot, circ, R });
+        });
+        if(!nodes.length) return { ecs:[], topR:1e-9, total:0 };
         const ecs=nodes.map(n=>({ r:n.R*(1+EM), node:n }));
-        const topR=cp_packEnclose(ecs);
-        const pad=20, s=Math.min(CW-2*pad, CH-2*pad)/(2*topR);
-        const CX=CW/2, CY=CH/2;
-        const totQ=nodes.reduce((a,n)=>a+n.total,0);
-        // denominator for prevalence readouts = gradeable transcripts over visible stages
-        const denom=cols.reduce((a,c)=>a+((T.stageSamples||[])[c]||0),0);
+        return { ecs, topR:cp_packEnclose(ecs), total:nodes.reduce((a,n)=>a+n.total,0) };
+      };
+      const packs=cols.map(c=>packStage(c));
+      if(packs.some(p=>p.ecs.length)){
+        const NS2=cols.length, cellW=CW/NS2, cyc=(CH-LABH)/2;
+        const maxTopR=Math.max(...packs.map(p=>p.topR),1e-9);
+        const s=Math.min(cellW*0.92, (CH-LABH)*0.92)/(2*maxTopR);
         const els=[];
-        // draw largest types first so smaller ones (and their labels) sit on top
-        const draw=ecs.map((ec,i)=>({ec,i})).sort((p,q)=>q.ec.node.R-p.ec.node.R);
-        draw.forEach(({ec})=>{
-          const n=ec.node, ex=CX+ec.x*s, ey=CY+ec.y*s, eR=n.R*s;
-          const dim=st.selFam&&st.selFam!==n.key, on=st.selFam===n.key;
-          els.push(h('circle',{key:'e'+n.key,cx:ex.toFixed(1),cy:ey.toFixed(1),r:eR.toFixed(1),
+        const drawNode=(ec,cx,idp,dim,on)=>{
+          const n=ec.node, ex=cx+ec.x*s, ey=cyc+ec.y*s, eR=n.R*s;
+          els.push(h('circle',{key:'e'+idp,cx:ex.toFixed(1),cy:ey.toFixed(1),r:eR.toFixed(1),
             fill:n.color,fillOpacity:dim?0.04:0.09,stroke:n.color,strokeOpacity:dim?0.3:(on?1:0.75),strokeWidth:on?2.4:1.3,
             style:{cursor:'pointer'},onClick:()=>this.pickFam(n.key)},
-            h('title',{key:'t'},n.label+' — '+n.total+' quotes'+(denom?' · '+(100*n.total/denom).toFixed(1)+'% of transcripts':'')+' · '+n.circ.length+' subtypes')));
+            h('title',{key:'t'},n.label+' — '+n.total+' quotes · '+n.circ.length+' subtypes')));
           n.circ.forEach((cc,ci)=>{
             const kx=ex+cc.x*s, ky=ey+cc.y*s, kr=(cc.r/(1+GAPF))*s, rem=cc.data.remainder;
-            els.push(h('circle',{key:'k'+n.key+ci,cx:kx.toFixed(1),cy:ky.toFixed(1),r:Math.max(1,kr).toFixed(1),
+            els.push(h('circle',{key:'k'+idp+'_'+ci,cx:kx.toFixed(1),cy:ky.toFixed(1),r:Math.max(1,kr).toFixed(1),
               fill:rem?'#9E9C95':n.color,fillOpacity:dim?0.1:(rem?0.3:0.55),stroke:'#FBFAF8',strokeWidth:0.7,
               style:{cursor:'pointer'},onClick:()=>this.pickFam(n.key)},
               h('title',{key:'t'},rem?(n.label+' · other / unclustered — '+cc.data.val+' quotes'):(n.label+' · '+cc.data.text+' — '+cc.data.val+' quotes'))));
             if(kr>=15 && !dim){
               const raw=rem?'other':cc.data.text;
-              // drop the redundant leading type word ("User Expected Answer" -> "Expected Answer")
               const lw=raw.split(/\s+/), lbl=(!rem && lw.length>1 && lw[0].toLowerCase()===n.label.toLowerCase())?lw.slice(1).join(' '):raw;
               const fs=Math.min(13,Math.max(8,kr*0.26));
               const cpl=Math.max(4,Math.floor(kr*1.5/(fs*0.53)));
               const mxl=Math.max(1,Math.min(4,Math.floor(kr*1.55/(fs*1.12))));
               const lines=cp_wrap(lbl,cpl,mxl), lh=fs*1.12, y0=ky-(lines.length-1)*lh/2+fs*0.34;
-              lines.forEach((ln,li)=> els.push(h('text',{key:'kl'+n.key+ci+'_'+li,x:kx.toFixed(1),y:(y0+li*lh).toFixed(1),textAnchor:'middle',
+              lines.forEach((ln,li)=> els.push(h('text',{key:'kl'+idp+'_'+ci+'_'+li,x:kx.toFixed(1),y:(y0+li*lh).toFixed(1),textAnchor:'middle',
                 style:{font:'600 '+fs.toFixed(1)+'px "Spline Sans",sans-serif',fill:rem?'#54534E':'#26261F',paintOrder:'stroke',stroke:'#FBFAF8',strokeWidth:'2.2px',pointerEvents:'none'}},ln))); }
           });
-          els.push(h('text',{key:'el'+n.key,x:ex.toFixed(1),y:(ey-eR+13).toFixed(1),textAnchor:'middle',
-            style:{font:'700 13px "Spline Sans",sans-serif',fill:dim?'#B7B5AE':n.color,paintOrder:'stroke',stroke:'#F6F5F2',strokeWidth:'3px',pointerEvents:'none',cursor:'pointer'},onClick:()=>this.pickFam(n.key)},n.label));
+          if(eR>=24) els.push(h('text',{key:'el'+idp,x:ex.toFixed(1),y:(ey-eR+13).toFixed(1),textAnchor:'middle',
+            style:{font:'700 '+Math.min(13,Math.max(10,eR*0.16)).toFixed(1)+'px "Spline Sans",sans-serif',fill:dim?'#B7B5AE':n.color,paintOrder:'stroke',stroke:'#F6F5F2',strokeWidth:'3px',pointerEvents:'none',cursor:'pointer'},onClick:()=>this.pickFam(n.key)},n.label));
+        };
+        packs.forEach((p,pi)=>{
+          const stg=cols[pi], cx=cellW*pi+cellW/2;
+          if(pi>0) els.push(h('line',{key:'dv'+pi,x1:(cellW*pi).toFixed(1),x2:(cellW*pi).toFixed(1),y1:6,y2:(CH-LABH-2).toFixed(1),stroke:'#ECEAE4',strokeWidth:1}));
+          p.ecs.slice().sort((a,b)=>b.node.R-a.node.R).forEach(ec=>{ const on=st.selFam===ec.node.key, dim=st.selFam&&!on; drawNode(ec,cx,pi+'_'+ec.node.key,dim,on); });
+          const slab=cp_wrap(COLLBL[stg], Math.max(8,Math.floor(cellW/6.4)), 2);
+          slab.forEach((ln,li)=> els.push(h('text',{key:'sl'+pi+'_'+li,x:cx.toFixed(1),y:(CH-LABH+16+li*12.5).toFixed(1),textAnchor:'middle',
+            style:{font:(STAGES[stg].is_reference?'600 ':'700 ')+'11.5px "Spline Sans",sans-serif',fill:STAGES[stg].is_reference?'#8A8780':'#33332E'}},ln)));
+          els.push(h('text',{key:'sn'+pi,x:cx.toFixed(1),y:(CH-7).toFixed(1),textAnchor:'middle',
+            style:{font:'10px "Spline Sans Mono",monospace',fill:'#A6A49D'}}, p.total+' quotes'));
         });
         flowChart=h('svg',{viewBox:'0 0 '+CW+' '+CH,preserveAspectRatio:'xMidYMid meet',
           style:{position:'absolute',inset:0,width:'100%',height:'100%',overflow:'visible'}},els);
-        flowTitle='Type & subtype composition';
-        flowSub='circle = a metagaming TYPE · inner circles = implication SUBTYPES (grey = unclustered) · area ∝ quotes over visible stages · '+scopeShort+' · '+totQ+' quotes';
+        flowTitle='Type & subtype composition across the lineage';
+        flowSub='one circle-pack per stage (left→right) · circle = TYPE, inner = SUBTYPE (grey = unclustered) · area ∝ quotes at that stage, common scale · '+scopeShort;
       }
     }
 
@@ -511,10 +521,13 @@ class Component extends DCLogic {
       // the entity's peak rate so a small cluster reads as HONESTLY small (not auto-scaled
       // per cluster); the trend arrow + total count keep the trajectory legible even when a
       // small cluster's line is nearly flat. Native <title> gives exact per-stage values.
+      // scope-aware: per-eval counts when a benchmark filter is active, else pooled per-stage.
+      const _svAt=(im,c)=> (evals && im.byEval) ? evals.reduce((a,e)=>a+(((im.byEval[e])||[])[c]||0),0) : ((im.counts||[])[c]||0);
+      const _denAt=(c)=> evals ? evals.reduce((a,e)=>a+((T.sampleTotals[e]||[])[c]||0),0) : ((T.stageSamples||[])[c]||0);
       const implItems=(selFamObj.implications||[]).map(im=>{
-        const cs=im.counts||[];
-        const total=cols.reduce((s,c)=>s+(cs[c]||0),0);
-        const rates=cols.map(c=>{ const d=(T.stageSamples||[])[c]||0; return d?(cs[c]||0)/d:0; });
+        const cs=cols.map(c=>_svAt(im,c));                 // per-VISIBLE-stage (aligned to cols), scope-aware
+        const total=cs.reduce((a,v)=>a+v,0);
+        const rates=cols.map((c,k)=>{ const d=_denAt(c); return d?cs[k]/d:0; });
         return { text:im.text, total, cs, rates };
       }).filter(x=>x.total>0).sort((a,b)=>b.total-a.total).slice(0,14);
       detImpls=implItems;   // truthiness guard for the template section
@@ -533,7 +546,7 @@ class Component extends DCLogic {
             kids.push(h('path',{key:'l',d:line,fill:'none',stroke:selColor,strokeWidth:1.5,strokeLinejoin:'round',strokeLinecap:'round'})); }
           pts.forEach((p,k)=>{ const last=k===nPts-1;
             kids.push(h('circle',{key:'c'+k,cx:p[0].toFixed(1),cy:p[1].toFixed(1),r:last?2.4:1.5,fill:last?selColor:'#FFFFFF',stroke:selColor,strokeWidth:1})); });
-          kids.push(h('title',{key:'ti'},selFamObj.label+' · '+item.text+'\n'+cols.map((c,k)=>COLLBL[c]+': '+item.cs[c]+' quotes ('+item.rates[k].toFixed(3)+'/tx)').join('\n')));
+          kids.push(h('title',{key:'ti'},selFamObj.label+' · '+item.text+'\n'+cols.map((c,k)=>COLLBL[c]+': '+item.cs[k]+' quotes ('+item.rates[k].toFixed(3)+'/tx)').join('\n')));
           return h('svg',{width:SW,height:SH,viewBox:'0 0 '+SW+' '+SH,style:{display:'block',flex:'none',overflow:'visible'}},kids);
         };
         const rows=implItems.map((item,ii)=>{

@@ -68,7 +68,7 @@ class Component extends DCLogic {
     const dsId=isMulti ? ((this.state.dataset && TX.datasets[this.state.dataset]) ? this.state.dataset : TX.default) : null;
     const T=isMulti ? TX.datasets[dsId] : TX;
     const LMETA=isMulti ? (TX.lineages[dsId]||{}) : {};
-    if(!T) return { ready:false, hasSel:false, legend:[], benchGroups:[], flowChart:null, flowTitle:'Composition by stage', statQuotes:'', statResponses:'', statBenchmarks:'', detRows:[], detBench:[], detQuotes:[], detImpls:[], stageChips:[], stageToggles:[], lineageOptions:[], lineageChips:[], lineageShow:false, headerKicker:'Metagaming taxonomy', headerTitle:'How does the taxonomy of metagaming verbalizations change across post-training?', tipShow:false, flowMin:440, benchDescShow:false, benchDescTag:'', benchDescText:'', benchDescUrl:'', detClass:[], veaSplit:[], accBands:[], accThrChips:[], accReady:false, eaSub:'', veaColLbl:'', mgColLbl:'', veaSwatch:'#7A3E9A', mgSwatch:'#2C6E63', modelGroupChips:[], showAllFams:this.showAllFams, anyHidden:false, anyStageHidden:false, showAllStages:this.showAllStages, txOpen:false, txModel:'', txFamily:'', txEval:'', txSid:'', txQuote:'', txOrig:'', txHasOrig:false, txParts:[], closeTx:this.closeTx, onFlowMove:this.onFlowMove, onFlowLeave:this.onFlowLeave };
+    if(!T) return { ready:false, hasSel:false, legend:[], benchGroups:[], flowChart:null, flowTitle:'Composition by stage', statQuotes:'', statResponses:'', statBenchmarks:'', detRows:[], detBench:[], detQuotes:[], detImpls:[], detImplsPanel:null, stageChips:[], stageToggles:[], lineageOptions:[], lineageChips:[], lineageShow:false, headerKicker:'Metagaming taxonomy', headerTitle:'How does the taxonomy of metagaming verbalizations change across post-training?', tipShow:false, flowMin:440, benchDescShow:false, benchDescTag:'', benchDescText:'', benchDescUrl:'', detClass:[], veaSplit:[], accBands:[], accThrChips:[], accReady:false, eaSub:'', veaColLbl:'', mgColLbl:'', veaSwatch:'#7A3E9A', mgSwatch:'#2C6E63', modelGroupChips:[], showAllFams:this.showAllFams, anyHidden:false, anyStageHidden:false, showAllStages:this.showAllStages, txOpen:false, txModel:'', txFamily:'', txEval:'', txSid:'', txQuote:'', txOrig:'', txHasOrig:false, txParts:[], closeTx:this.closeTx, onFlowMove:this.onFlowMove, onFlowLeave:this.onFlowLeave };
     const st=this.state, P=this.props||{};
     const measure = st.measure || P.defaultMeasure || 'rate';
     const share = measure==='share';
@@ -343,7 +343,7 @@ class Component extends DCLogic {
 
     // ---------- detail panel ----------
     const selFamObj = st.selFam ? T.families.find(f=>f.key===st.selFam) : null;
-    let detRows=[], detBench=[], detQuotes=[], stageChips=[], detClass=[], detImpls=[], selName='', selKicker='', selColor='#888', quoteCount='', moreQuotes='';
+    let detRows=[], detBench=[], detQuotes=[], stageChips=[], detClass=[], detImpls=[], detImplsPanel=null, selName='', selKicker='', selColor='#888', quoteCount='', moreQuotes='';
     if(selFamObj){
       selColor=col(selFamObj.key);
       selName=selFamObj.label;
@@ -365,12 +365,56 @@ class Component extends DCLogic {
         const tt=by.capability+by.safety+by.natural;
         return { label:COLLBL[c], total:tt, lblColor:STAGES[c].is_reference?'#A6A49D':'#46453F',
           segs:T.catOrder.filter(cl=>by[cl]>0).map(cl=>({ w:(by[cl]/tt*100).toFixed(2)+'%', color:this.CAT[cl], lbl:(T.catLabel[cl]||cl)+': '+by[cl] })) }; });
-      // implication breakdown (schema 2): the open discovery axis inside this entity.
-      // counts are per stage; show totals over the VISIBLE columns so stage checkboxes compose.
-      const impls=(selFamObj.implications||[]).map(im=>{ const n=cols.reduce((s,c)=>s+((im.counts||[])[c]||0),0); return {im,n}; }).filter(x=>x.n>0).sort((a,b)=>b.n-a.n).slice(0,14);
-      const implMax=Math.max(...impls.map(x=>x.n),1);
-      detImpls=impls.map(({im,n})=>({ text:im.text, count:n, color:selColor,
-        barW:Math.max(4,(n/implMax)*90).toFixed(0)+'px' }));
+      // implication CLUSTER trajectories (schema 2): each cluster's per-stage rate across
+      // the lineage, so you can read how it grows/shrinks through post-training. rate =
+      // quotes / gradeable transcripts at that stage (T.stageSamples, pooled across
+      // benchmarks — the same denominator the flow chart uses). Shared 0-based y-scale to
+      // the entity's peak rate so a small cluster reads as HONESTLY small (not auto-scaled
+      // per cluster); the trend arrow + total count keep the trajectory legible even when a
+      // small cluster's line is nearly flat. Native <title> gives exact per-stage values.
+      const implItems=(selFamObj.implications||[]).map(im=>{
+        const cs=im.counts||[];
+        const total=cols.reduce((s,c)=>s+(cs[c]||0),0);
+        const rates=cols.map(c=>{ const d=(T.stageSamples||[])[c]||0; return d?(cs[c]||0)/d:0; });
+        return { text:im.text, total, cs, rates };
+      }).filter(x=>x.total>0).sort((a,b)=>b.total-a.total).slice(0,14);
+      detImpls=implItems;   // truthiness guard for the template section
+      if(implItems.length){
+        const nPts=cols.length;
+        const SW=86, SH=22, PADX=3, PADY=3, plotH=SH-2*PADY, sBase=SH-PADY;
+        const implPeak=Math.max(...implItems.flatMap(x=>x.rates),1e-9);
+        const xAt=(k)=> nPts<=1?SW/2: PADX+(k/(nPts-1))*(SW-2*PADX);
+        const yAt=(r)=> sBase-(r/implPeak)*plotH;
+        const mkSpark=(item)=>{
+          const pts=item.rates.map((r,k)=>[xAt(k),yAt(r)]);
+          const line=pts.map((p,k)=>(k?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
+          const kids=[];
+          if(nPts>1){ const area=line+' L'+xAt(nPts-1).toFixed(1)+' '+sBase+' L'+xAt(0).toFixed(1)+' '+sBase+' Z';
+            kids.push(h('path',{key:'a',d:area,fill:selColor,opacity:0.12,stroke:'none'}));
+            kids.push(h('path',{key:'l',d:line,fill:'none',stroke:selColor,strokeWidth:1.5,strokeLinejoin:'round',strokeLinecap:'round'})); }
+          pts.forEach((p,k)=>{ const last=k===nPts-1;
+            kids.push(h('circle',{key:'c'+k,cx:p[0].toFixed(1),cy:p[1].toFixed(1),r:last?2.4:1.5,fill:last?selColor:'#FFFFFF',stroke:selColor,strokeWidth:1})); });
+          kids.push(h('title',{key:'ti'},selFamObj.label+' · '+item.text+'\n'+cols.map((c,k)=>COLLBL[c]+': '+item.cs[c]+' quotes ('+item.rates[k].toFixed(3)+'/tx)').join('\n')));
+          return h('svg',{width:SW,height:SH,viewBox:'0 0 '+SW+' '+SH,style:{display:'block',flex:'none',overflow:'visible'}},kids);
+        };
+        const rows=implItems.map((item,ii)=>{
+          let arrow='',aColor='#B7B5AE';
+          if(nPts>1){ const dv=item.rates[nPts-1]-item.rates[0];
+            if(Math.abs(dv)<1e-9){arrow='→';} else if(dv>0){arrow='▲';aColor=selColor;} else {arrow='▼';aColor='#B0ADA6';} }
+          return h('div',{key:'ir'+ii,style:{display:'flex',alignItems:'center',gap:'7px',padding:'2px 6px'}},[
+            h('span',{key:'t',title:item.text,style:{flex:'1 1 auto',minWidth:0,fontSize:'11px',lineHeight:1.3,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},item.text),
+            mkSpark(item),
+            h('span',{key:'n',style:{flex:'none',width:'22px',textAlign:'right',fontFamily:"'Spline Sans Mono',monospace",fontSize:'9.5px',color:'#93918B',fontVariantNumeric:'tabular-nums'}},String(item.total)),
+            h('span',{key:'a',style:{flex:'none',width:'11px',textAlign:'center',fontFamily:"'Spline Sans Mono',monospace",fontSize:'10px',color:aColor}},arrow),
+          ]);
+        });
+        const ends = nPts<=1 ? ('single stage: '+COLLBL[cols[0]]) : ('left→right: '+COLLBL[cols[0]]+' → '+COLLBL[cols[nPts-1]]);
+        const cap = ends+' · rate = quotes/transcript, shared scale (peak '+implPeak.toFixed(3)+'/tx) · pooled across benchmarks';
+        detImplsPanel=h('div',{},[
+          h('div',{key:'rows',style:{display:'flex',flexDirection:'column',gap:'3px'}},rows),
+          h('div',{key:'cap',style:{fontFamily:"'Spline Sans Mono',monospace",fontSize:'9px',lineHeight:1.5,color:'#B7B5AE',marginTop:'8px'}},cap),
+        ]);
+      }
       // benchmark mix for this family (lineage counts), all benchmarks regardless of scope
       const mix=T.evals.map(e=>{ const a=selFamObj.byEval[e.key]; const n=a?lin.reduce((s,c)=>s+(a[c]||0),0):0; return {e, n}; }).filter(x=>x.n>0).sort((a,b)=>b.n-a.n);
       const mixMax=Math.max(...mix.map(x=>x.n),1);
@@ -535,7 +579,7 @@ class Component extends DCLogic {
       clearSel:this.clearSel, clearLabel:(st.selFam)?'clear':'',
       clearBtnStyle:'font-family:\'Spline Sans Mono\',monospace;font-size:9.5px;color:#2C6E63;background:none;border:none;cursor:pointer;padding:0;'+(st.selFam?'':'visibility:hidden'),
       hasSel:!!selFamObj,
-      selName, selKicker, selColor, detRows, detClass, detBench, detImpls, detQuotes, quoteCount, moreQuotes, stageChips,
+      selName, selKicker, selColor, detRows, detClass, detBench, detImpls, detImplsPanel, detQuotes, quoteCount, moreQuotes, stageChips,
       lineageShow, lineageOptions, lineageChips, onLineageChange, headerKicker, headerTitle,
       stageToggles, anyStageHidden, showAllStages:this.showAllStages,
       txOpen, txModel, txFamily, txEval, txSid, txQuote, txOrig, txHasOrig, txParts, txHasCw, txCwParts, closeTx:this.closeTx,

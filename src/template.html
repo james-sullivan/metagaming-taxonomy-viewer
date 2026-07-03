@@ -375,16 +375,8 @@ html,body{margin:0;height:100%;background:#F6F5F2}
         </div>
 
         <sc-if value="{{ detImpls }}" hint-placeholder-val="{{ false }}">
-          <div style="font-family:'Spline Sans Mono',monospace;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:#93918B;margin-bottom:9px">Implications <span style="text-transform:none;letter-spacing:0;color:#C2BEB4">· what the model infers</span></div>
-          <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:22px">
-            <sc-for list="{{ detImpls }}" as="im" hint-placeholder-count="6">
-              <div style="display:flex;align-items:center;gap:8px;padding:3px 6px">
-                <span style="flex:1;min-width:0;font-size:11px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ im.text }}">{{ im.text }}</span>
-                <span style="flex:none;height:6px;width:{{ im.barW }};max-width:90px;background:{{ im.color }};opacity:.5;border-radius:3px"></span>
-                <span style="flex:none;font-family:'Spline Sans Mono',monospace;font-size:9.5px;color:#93918B;width:26px;text-align:right">{{ im.count }}</span>
-              </div>
-            </sc-for>
-          </div>
+          <div style="font-family:'Spline Sans Mono',monospace;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:#93918B;margin-bottom:9px">Implication clusters <span style="text-transform:none;letter-spacing:0;color:#C2BEB4">· trajectory across stages</span></div>
+          <div style="margin-bottom:22px">{{ detImplsPanel }}</div>
         </sc-if>
 
         <div style="font-family:'Spline Sans Mono',monospace;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:#93918B;margin-bottom:9px">Benchmark mix <span style="text-transform:none;letter-spacing:0;color:#C2BEB4">· lineage</span></div>

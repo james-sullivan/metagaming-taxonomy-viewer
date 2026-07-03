@@ -91,6 +91,7 @@ class Component extends DCLogic {
   setScope=(v)=>this.setState(s=>({scope:s.scope===v?'all':v}));
   allBench=()=>this.setState({scope:'all'});
   setAccThr=(t)=>this.setState({accThr:t});
+  setCompView=(v)=>this.setState({compView:v});
   showTx=(tk,qt,oq,fam,cw)=>this.setState({openTx:tk, openTxQuote:qt||'', openTxOrig:oq||qt||'', openTxFam:fam||'', openTxCw:cw||''});
   closeTx=()=>this.setState({openTx:null, openTxQuote:'', openTxOrig:'', openTxFam:'', openTxCw:''});
   onFlowMove=(e)=>{ const r=e.currentTarget.getBoundingClientRect(); this.setState({hx:e.clientX-r.left, hy:e.clientY-r.top, hw:r.width, hh:r.height}); };
@@ -137,7 +138,7 @@ class Component extends DCLogic {
     const dsId=isMulti ? ((this.state.dataset && TX.datasets[this.state.dataset]) ? this.state.dataset : TX.default) : null;
     const T=isMulti ? TX.datasets[dsId] : TX;
     const LMETA=isMulti ? (TX.lineages[dsId]||{}) : {};
-    if(!T) return { ready:false, hasSel:false, legend:[], benchGroups:[], flowChart:null, flowTitle:'Composition by stage', statQuotes:'', statResponses:'', statBenchmarks:'', detRows:[], detBench:[], detQuotes:[], detImpls:[], detImplsPanel:null, stageChips:[], stageToggles:[], lineageOptions:[], lineageChips:[], lineageShow:false, headerKicker:'Metagaming taxonomy', headerTitle:'How does the taxonomy of metagaming verbalizations change across post-training?', tipShow:false, flowMin:440, benchDescShow:false, benchDescTag:'', benchDescText:'', benchDescUrl:'', detClass:[], veaSplit:[], accBands:[], accThrChips:[], accReady:false, eaSub:'', veaColLbl:'', mgColLbl:'', veaSwatch:'#7A3E9A', mgSwatch:'#2C6E63', modelGroupChips:[], showAllFams:this.showAllFams, anyHidden:false, anyStageHidden:false, showAllStages:this.showAllStages, txOpen:false, txModel:'', txFamily:'', txEval:'', txSid:'', txQuote:'', txOrig:'', txHasOrig:false, txParts:[], closeTx:this.closeTx, onFlowMove:this.onFlowMove, onFlowLeave:this.onFlowLeave };
+    if(!T) return { ready:false, hasSel:false, legend:[], benchGroups:[], flowChart:null, flowTitle:'Composition by stage', compViewChips:[], statQuotes:'', statResponses:'', statBenchmarks:'', detRows:[], detBench:[], detQuotes:[], detImpls:[], detImplsPanel:null, stageChips:[], stageToggles:[], lineageOptions:[], lineageChips:[], lineageShow:false, headerKicker:'Metagaming taxonomy', headerTitle:'How does the taxonomy of metagaming verbalizations change across post-training?', tipShow:false, flowMin:440, benchDescShow:false, benchDescTag:'', benchDescText:'', benchDescUrl:'', detClass:[], veaSplit:[], accBands:[], accThrChips:[], accReady:false, eaSub:'', veaColLbl:'', mgColLbl:'', veaSwatch:'#7A3E9A', mgSwatch:'#2C6E63', modelGroupChips:[], showAllFams:this.showAllFams, anyHidden:false, anyStageHidden:false, showAllStages:this.showAllStages, txOpen:false, txModel:'', txFamily:'', txEval:'', txSid:'', txQuote:'', txOrig:'', txHasOrig:false, txParts:[], closeTx:this.closeTx, onFlowMove:this.onFlowMove, onFlowLeave:this.onFlowLeave };
     const st=this.state, P=this.props||{};
     const measure = st.measure || P.defaultMeasure || 'rate';
     const share = measure==='share';
@@ -392,85 +393,139 @@ class Component extends DCLogic {
     let flowSub = (share?'share of each stage’s verbalizations':rateMode?'metagaming quotes per transcript — height = rate':txRateMode?'% of transcripts with ≥1 quote in each family — one bar per family, not stacked':'absolute quote counts (height scaled to peak stage)') + ' · '+scopeShort;
     let flowTitle = txRateMode?'Transcript coverage by family':'Composition by stage';
 
-    // ---------- type / subtype circle packing, one pack PER STAGE (small multiples) --------
-    // Each visible lineage stage gets its own circle-pack, laid out left→right, so you read the
-    // composition CHANGE base→final. In each pack: circle = a metagaming TYPE, inner circles =
-    // implication SUBTYPES (named clusters + a muted "unclustered" remainder). Circle AREA ∝
-    // quotes AT THAT STAGE within the active benchmark scope, on a COMMON scale across stages so
-    // sizes are comparable along the lineage. N packs fill the panel width; responds to the
-    // benchmark filter via each implication's per-eval counts. Falls back to the stacked flow
-    // only if no visible family has clustered implications.
+    // ---------- central composition view: circle-pack OR nested stacked bars (toggle) ------
+    // Both show the type→subtype composition across the lineage stages and respond to the
+    // benchmark filter. Circles: one pack per stage (area ∝ quotes at that stage). Bars: one
+    // stacked bar per stage; each TYPE is a segment, subdivided into its SUBTYPE slices.
     {
-      const CW=1320, CH=560, LABH=46, GAPF=0.16, EM=0.05;
-      // subtype value at stage si under the active benchmark scope (per-eval counts if filtered)
+      const compView = st.compView || 'bars';
+      // scope-aware subtype value at stage si (per-eval counts when a benchmark is filtered)
       const subValAt=(im,si)=> (evals && im.byEval)
         ? evals.reduce((a,e)=>a+(((im.byEval[e])||[])[si]||0),0)
         : ((im.counts||[])[si]||0);
-      const packStage=(si)=>{
-        const nodes=[];
-        order.forEach(f=>{
-          const named=(f.implications||[]).map(im=>({ text:im.text, val:subValAt(im,si) }))
-            .filter(k=>k.val>0).sort((a,b)=>b.val-a.val);
-          const entTot=EFF[f.key][si]||0;                     // scope-aware type total at this stage
-          const rem=entTot-named.reduce((a,k)=>a+k.val,0);
-          const kids=named.slice();
-          if(rem>0.5) kids.push({ text:'other / unclustered', val:rem, remainder:true });
-          if(!kids.length) return;
-          const circ=kids.map(k=>({ r:Math.sqrt(k.val)*(1+GAPF), data:k }));
-          const R=cp_packEnclose(circ);
-          nodes.push({ key:f.key, label:f.label, color:col(f.key), total:entTot, circ, R });
-        });
-        if(!nodes.length) return { ecs:[], topR:1e-9, total:0 };
-        const ecs=nodes.map(n=>({ r:n.R*(1+EM), node:n }));
-        return { ecs, topR:cp_packEnclose(ecs), total:nodes.reduce((a,n)=>a+n.total,0) };
+      // per (type, stage): named subtype entries + a muted "unclustered" remainder, scope-aware
+      const subList=(f,si)=>{
+        const named=(f.implications||[]).map(im=>({ text:im.text, val:subValAt(im,si) }))
+          .filter(k=>k.val>0).sort((a,b)=>b.val-a.val);
+        const total=EFF[f.key][si]||0, rem=total-named.reduce((a,k)=>a+k.val,0);
+        const kids=named.slice();
+        if(rem>0.5) kids.push({ text:'other / unclustered', val:rem, remainder:true });
+        return { kids, total };
       };
-      const packs=cols.map(c=>packStage(c));
-      if(packs.some(p=>p.ecs.length)){
-        const NS2=cols.length, cellW=CW/NS2, cyc=(CH-LABH)/2;
-        const maxTopR=Math.max(...packs.map(p=>p.topR),1e-9);
-        const s=Math.min(cellW*0.92, (CH-LABH)*0.92)/(2*maxTopR);
-        const els=[];
-        const drawNode=(ec,cx,idp,dim,on)=>{
-          const n=ec.node, ex=cx+ec.x*s, ey=cyc+ec.y*s, eR=n.R*s;
-          els.push(h('circle',{key:'e'+idp,cx:ex.toFixed(1),cy:ey.toFixed(1),r:eR.toFixed(1),
-            fill:n.color,fillOpacity:dim?0.04:0.09,stroke:n.color,strokeOpacity:dim?0.3:(on?1:0.75),strokeWidth:on?2.4:1.3,
-            style:{cursor:'pointer'},onClick:()=>this.pickFam(n.key)},
-            h('title',{key:'t'},n.label+' — '+n.total+' quotes · '+n.circ.length+' subtypes')));
-          n.circ.forEach((cc,ci)=>{
-            const kx=ex+cc.x*s, ky=ey+cc.y*s, kr=(cc.r/(1+GAPF))*s, rem=cc.data.remainder;
-            els.push(h('circle',{key:'k'+idp+'_'+ci,cx:kx.toFixed(1),cy:ky.toFixed(1),r:Math.max(1,kr).toFixed(1),
-              fill:rem?'#9E9C95':n.color,fillOpacity:dim?0.1:(rem?0.3:0.55),stroke:'#FBFAF8',strokeWidth:0.7,
-              style:{cursor:'pointer'},onClick:()=>this.pickFam(n.key)},
-              h('title',{key:'t'},rem?(n.label+' · other / unclustered — '+cc.data.val+' quotes'):(n.label+' · '+cc.data.text+' — '+cc.data.val+' quotes'))));
-            if(kr>=15 && !dim){
-              const raw=rem?'other':cc.data.text;
-              const lw=raw.split(/\s+/), lbl=(!rem && lw.length>1 && lw[0].toLowerCase()===n.label.toLowerCase())?lw.slice(1).join(' '):raw;
-              const fs=Math.min(13,Math.max(8,kr*0.26));
-              const cpl=Math.max(4,Math.floor(kr*1.5/(fs*0.53)));
-              const mxl=Math.max(1,Math.min(4,Math.floor(kr*1.55/(fs*1.12))));
-              const lines=cp_wrap(lbl,cpl,mxl), lh=fs*1.12, y0=ky-(lines.length-1)*lh/2+fs*0.34;
-              lines.forEach((ln,li)=> els.push(h('text',{key:'kl'+idp+'_'+ci+'_'+li,x:kx.toFixed(1),y:(y0+li*lh).toFixed(1),textAnchor:'middle',
-                style:{font:'600 '+fs.toFixed(1)+'px "Spline Sans",sans-serif',fill:rem?'#54534E':'#26261F',paintOrder:'stroke',stroke:'#FBFAF8',strokeWidth:'2.2px',pointerEvents:'none'}},ln))); }
+
+      if(compView==='circles'){
+        const CW=1320, CH=560, LABH=40, GAPF=0.10, EM=0.03;
+        const packStage=(si)=>{
+          const nodes=[];
+          order.forEach(f=>{
+            const {kids,total}=subList(f,si);
+            if(!kids.length) return;
+            const circ=kids.map(k=>({ r:Math.sqrt(k.val)*(1+GAPF), data:k }));
+            nodes.push({ key:f.key, label:f.label, color:col(f.key), total, circ, R:cp_packEnclose(circ) });
           });
-          if(eR>=24) els.push(h('text',{key:'el'+idp,x:ex.toFixed(1),y:(ey-eR+13).toFixed(1),textAnchor:'middle',
-            style:{font:'700 '+Math.min(13,Math.max(10,eR*0.16)).toFixed(1)+'px "Spline Sans",sans-serif',fill:dim?'#B7B5AE':n.color,paintOrder:'stroke',stroke:'#F6F5F2',strokeWidth:'3px',pointerEvents:'none',cursor:'pointer'},onClick:()=>this.pickFam(n.key)},n.label));
+          if(!nodes.length) return { ecs:[], topR:1e-9, total:0 };
+          const ecs=nodes.map(n=>({ r:n.R*(1+EM), node:n }));
+          return { ecs, topR:cp_packEnclose(ecs), total:nodes.reduce((a,n)=>a+n.total,0) };
         };
-        packs.forEach((p,pi)=>{
-          const stg=cols[pi], cx=cellW*pi+cellW/2;
-          if(pi>0) els.push(h('line',{key:'dv'+pi,x1:(cellW*pi).toFixed(1),x2:(cellW*pi).toFixed(1),y1:6,y2:(CH-LABH-2).toFixed(1),stroke:'#ECEAE4',strokeWidth:1}));
-          p.ecs.slice().sort((a,b)=>b.node.R-a.node.R).forEach(ec=>{ const on=st.selFam===ec.node.key, dim=st.selFam&&!on; drawNode(ec,cx,pi+'_'+ec.node.key,dim,on); });
-          const slab=cp_wrap(COLLBL[stg], Math.max(8,Math.floor(cellW/6.4)), 2);
-          slab.forEach((ln,li)=> els.push(h('text',{key:'sl'+pi+'_'+li,x:cx.toFixed(1),y:(CH-LABH+16+li*12.5).toFixed(1),textAnchor:'middle',
-            style:{font:(STAGES[stg].is_reference?'600 ':'700 ')+'11.5px "Spline Sans",sans-serif',fill:STAGES[stg].is_reference?'#8A8780':'#33332E'}},ln)));
-          els.push(h('text',{key:'sn'+pi,x:cx.toFixed(1),y:(CH-7).toFixed(1),textAnchor:'middle',
-            style:{font:'10px "Spline Sans Mono",monospace',fill:'#A6A49D'}}, p.total+' quotes'));
+        const packs=cols.map(c=>packStage(c));
+        if(packs.some(p=>p.ecs.length)){
+          const NS2=cols.length, cellW=CW/NS2, cyc=(CH-LABH)/2;
+          const maxTopR=Math.max(...packs.map(p=>p.topR),1e-9);
+          const s=Math.min(cellW*0.98, (CH-LABH)*0.98)/(2*maxTopR);
+          const els=[];
+          const drawNode=(ec,cx,idp,dim,on)=>{
+            const n=ec.node, ex=cx+ec.x*s, ey=cyc+ec.y*s, eR=n.R*s;
+            els.push(h('circle',{key:'e'+idp,cx:ex.toFixed(1),cy:ey.toFixed(1),r:eR.toFixed(1),
+              fill:n.color,fillOpacity:dim?0.04:0.09,stroke:n.color,strokeOpacity:dim?0.3:(on?1:0.75),strokeWidth:on?2.4:1.3,
+              style:{cursor:'pointer'},onClick:()=>this.pickFam(n.key)},
+              h('title',{key:'t'},n.label+' — '+n.total+' quotes · '+n.circ.length+' subtypes')));
+            n.circ.forEach((cc,ci)=>{
+              const kx=ex+cc.x*s, ky=ey+cc.y*s, kr=(cc.r/(1+GAPF))*s, rem=cc.data.remainder;
+              els.push(h('circle',{key:'k'+idp+'_'+ci,cx:kx.toFixed(1),cy:ky.toFixed(1),r:Math.max(1,kr).toFixed(1),
+                fill:rem?'#9E9C95':n.color,fillOpacity:dim?0.1:(rem?0.3:0.55),stroke:'#FBFAF8',strokeWidth:0.7,
+                style:{cursor:'pointer'},onClick:()=>this.pickFam(n.key)},
+                h('title',{key:'t'},rem?(n.label+' · other / unclustered — '+cc.data.val+' quotes'):(n.label+' · '+cc.data.text+' — '+cc.data.val+' quotes'))));
+              if(kr>=15 && !dim){
+                const raw=rem?'other':cc.data.text;
+                const lw=raw.split(/\s+/), lbl=(!rem && lw.length>1 && lw[0].toLowerCase()===n.label.toLowerCase())?lw.slice(1).join(' '):raw;
+                const fs=Math.min(13,Math.max(8,kr*0.26));
+                const cpl=Math.max(4,Math.floor(kr*1.5/(fs*0.53)));
+                const mxl=Math.max(1,Math.min(4,Math.floor(kr*1.55/(fs*1.12))));
+                const lines=cp_wrap(lbl,cpl,mxl), lh=fs*1.12, y0=ky-(lines.length-1)*lh/2+fs*0.34;
+                lines.forEach((ln,li)=> els.push(h('text',{key:'kl'+idp+'_'+ci+'_'+li,x:kx.toFixed(1),y:(y0+li*lh).toFixed(1),textAnchor:'middle',
+                  style:{font:'600 '+fs.toFixed(1)+'px "Spline Sans",sans-serif',fill:rem?'#54534E':'#26261F',paintOrder:'stroke',stroke:'#FBFAF8',strokeWidth:'2.2px',pointerEvents:'none'}},ln))); }
+            });
+            if(eR>=24) els.push(h('text',{key:'el'+idp,x:ex.toFixed(1),y:(ey-eR+13).toFixed(1),textAnchor:'middle',
+              style:{font:'700 '+Math.min(13,Math.max(10,eR*0.16)).toFixed(1)+'px "Spline Sans",sans-serif',fill:dim?'#B7B5AE':n.color,paintOrder:'stroke',stroke:'#F6F5F2',strokeWidth:'3px',pointerEvents:'none',cursor:'pointer'},onClick:()=>this.pickFam(n.key)},n.label));
+          };
+          packs.forEach((p,pi)=>{
+            const stg=cols[pi], cx=cellW*pi+cellW/2;
+            if(pi>0) els.push(h('line',{key:'dv'+pi,x1:(cellW*pi).toFixed(1),x2:(cellW*pi).toFixed(1),y1:6,y2:(CH-LABH-2).toFixed(1),stroke:'#ECEAE4',strokeWidth:1}));
+            p.ecs.slice().sort((a,b)=>b.node.R-a.node.R).forEach(ec=>{ const on=st.selFam===ec.node.key, dim=st.selFam&&!on; drawNode(ec,cx,pi+'_'+ec.node.key,dim,on); });
+            const slab=cp_wrap(COLLBL[stg], Math.max(8,Math.floor(cellW/6.4)), 2);
+            slab.forEach((ln,li)=> els.push(h('text',{key:'sl'+pi+'_'+li,x:cx.toFixed(1),y:(CH-LABH+15+li*12.5).toFixed(1),textAnchor:'middle',
+              style:{font:(STAGES[stg].is_reference?'600 ':'700 ')+'11.5px "Spline Sans",sans-serif',fill:STAGES[stg].is_reference?'#8A8780':'#33332E'}},ln)));
+            els.push(h('text',{key:'sn'+pi,x:cx.toFixed(1),y:(CH-6).toFixed(1),textAnchor:'middle',
+              style:{font:'10px "Spline Sans Mono",monospace',fill:'#A6A49D'}}, p.total+' quotes'));
+          });
+          flowChart=h('svg',{viewBox:'0 0 '+CW+' '+CH,preserveAspectRatio:'xMidYMid meet',
+            style:{position:'absolute',inset:0,width:'100%',height:'100%',overflow:'visible'}},els);
+          flowTitle='Type & subtype composition across the lineage';
+          flowSub='one circle-pack per stage (left→right) · circle = TYPE, inner = SUBTYPE (grey = unclustered) · area ∝ quotes at that stage, common scale · '+scopeShort;
+        }
+      } else {
+        // ----- nested stacked bars: one bar per stage; TYPE segments, SUBTYPE sub-slices -----
+        const W2=1320, H2=560, top=18, bot=64, axX=64, plotR=1298, ph2=H2-top-bot, baseY2=top+ph2;
+        const share = measure==='share';
+        const stages2=cols.map(si=>{
+          const fams=order.map(f=>{ const {kids,total}=subList(f,si); return { key:f.key, color:col(f.key), label:f.label, total, kids }; }).filter(x=>x.total>0);
+          return { si, fams, tot:fams.reduce((a,x)=>a+x.total,0), den:SAMP[si]||0 };
         });
-        flowChart=h('svg',{viewBox:'0 0 '+CW+' '+CH,preserveAspectRatio:'xMidYMid meet',
-          style:{position:'absolute',inset:0,width:'100%',height:'100%',overflow:'visible'}},els);
-        flowTitle='Type & subtype composition across the lineage';
-        flowSub='one circle-pack per stage (left→right) · circle = TYPE, inner = SUBTYPE (grey = unclustered) · area ∝ quotes at that stage, common scale · '+scopeShort;
+        if(stages2.some(s=>s.tot>0)){
+          const N=cols.length;
+          const metric=(s)=> share?1 : (s.den? s.tot/s.den : s.tot);
+          const axMax = share?1 : niceCeil(Math.max(...stages2.map(metric),1e-9));
+          const hOf=(s,cnt)=> share? (s.tot? cnt/s.tot : 0)*ph2 : ((s.den? cnt/s.den : 0)/axMax)*ph2;
+          const xL=axX+34, xR=plotR-90, cxOf=(k)=> N===1?(xL+xR)/2 : xL + k/(N-1)*(xR-xL);
+          const barW=Math.min(130, Math.max(26, (N>1?(xR-xL)/(N-1):xR-xL)*0.46));
+          const els=[];
+          [0,0.25,0.5,0.75,1].forEach((t,i)=>{ const y=baseY2 - t*ph2;
+            els.push(h('line',{key:'yg'+i,x1:axX,x2:plotR,y1:y.toFixed(1),y2:y.toFixed(1),stroke:'#ECEAE4',strokeWidth:1,strokeDasharray:i?'2 5':'none'}));
+            els.push(h('text',{key:'yl'+i,x:(axX-8).toFixed(1),y:(y+3).toFixed(1),textAnchor:'end',style:{font:'10px "Spline Sans Mono",monospace',fill:'#A6A49D'}}, share?Math.round(t*100)+'%':(+(t*axMax).toFixed(2)).toString())); });
+          els.push(h('text',{key:'yt',transform:'translate(16,'+(top+ph2/2)+') rotate(-90)',textAnchor:'middle',style:{font:'9.5px "Spline Sans Mono",monospace',fill:'#B7B5AE',letterSpacing:'.1em'}}, share?'SHARE OF STAGE':'QUOTES / TRANSCRIPT'));
+          stages2.forEach((s,k)=>{
+            const cx=cxOf(k); let y=baseY2;
+            s.fams.forEach(fm=>{
+              const segH=hOf(s,fm.total), dim=st.selFam&&st.selFam!==fm.key; let yy=y;
+              fm.kids.forEach((cc,ci)=>{ const sliceH=segH*(cc.val/(fm.total||1));
+                els.push(h('rect',{key:'b'+k+'_'+fm.key+'_'+ci,x:(cx-barW/2).toFixed(1),y:(yy-sliceH).toFixed(1),width:barW.toFixed(1),height:Math.max(0.4,sliceH).toFixed(1),
+                  fill:cc.remainder?'#9E9C95':fm.color,fillOpacity:dim?0.16:(cc.remainder?0.4:0.9),stroke:'#FBFAF8',strokeWidth:0.6,
+                  style:{cursor:'pointer'},onClick:()=>this.pickFam(fm.key)},
+                  h('title',{key:'t'}, fm.label+(cc.remainder?' · other / unclustered':' · '+cc.text)+' — '+cc.val+' quotes'+(s.tot?' ('+(100*cc.val/s.tot).toFixed(1)+'% of stage)':''))));
+                yy-=sliceH; });
+              y-=segH;
+            });
+            const slab=cp_wrap(COLLBL[cols[k]], 18, 2);
+            slab.forEach((ln,li)=> els.push(h('text',{key:'sx'+k+'_'+li,x:cx.toFixed(1),y:(baseY2+17+li*12).toFixed(1),textAnchor:'middle',style:{font:(STAGES[cols[k]].is_reference?'600 ':'700 ')+'11.5px "Spline Sans",sans-serif',fill:STAGES[cols[k]].is_reference?'#8A8780':'#33332E'}},ln)));
+            els.push(h('text',{key:'sc'+k,x:cx.toFixed(1),y:(baseY2+17+slab.length*12).toFixed(1),textAnchor:'middle',style:{font:'10px "Spline Sans Mono",monospace',fill:'#A6A49D'}}, s.tot+' quotes'));
+          });
+          const last=stages2[stages2.length-1];
+          if(last){ let yl=baseY2; const lx=(cxOf(N-1)+barW/2+10);
+            last.fams.forEach(fm=>{ const segH=hOf(last,fm.total);
+              if(segH>=13){ const dim=st.selFam&&st.selFam!==fm.key;
+                els.push(h('text',{key:'fl'+fm.key,x:lx.toFixed(1),y:(yl-segH/2+3.5).toFixed(1),textAnchor:'start',style:{font:'600 11px "Spline Sans",sans-serif',fill:dim?'#B7B5AE':fm.color,cursor:'pointer'},onClick:()=>this.pickFam(fm.key)},fm.label)); }
+              yl-=segH; }); }
+          flowChart=h('svg',{viewBox:'0 0 '+W2+' '+H2,preserveAspectRatio:'xMidYMid meet',
+            style:{position:'absolute',inset:0,width:'100%',height:'100%',overflow:'visible'}},els);
+          flowTitle='Type & subtype composition across the lineage';
+          flowSub='stacked bars per stage (left→right) · segments = TYPES, sub-slices = SUBTYPES (grey = unclustered) · '+(share?'each stage = 100%':'height = quotes / transcript, common scale')+' · '+scopeShort;
+        }
       }
     }
+    const compView = st.compView || 'bars';
+    const compViewChips=[{k:'bars',label:'Stacked bars'},{k:'circles',label:'Circle pack'}].map(o=>({
+      label:o.label, onClick:()=>this.setCompView(o.k),
+      style: chipBase + (compView===o.k ? 'background:#2C6E63;color:#fff;border:1px solid #2C6E63;font-weight:600' : 'background:#FFFFFF;color:#54534E;border:1px solid #E0DDD5') }));
 
     // ---------- tooltip ----------
     let hoverInfo='';
@@ -718,7 +773,7 @@ class Component extends DCLogic {
     }
 
     return {
-      ready:true, legend, flowChart, flowSub, flowTitle, hoverInfo, flowMin,
+      ready:true, legend, flowChart, flowSub, flowTitle, hoverInfo, flowMin, compViewChips,
       statQuotes, statResponses, statBenchmarks,
       benchGroups, totalAll, allBench:this.allBench, allBenchStyle, allBenchLabel, benchNote, scopeReadout, scopeShort,
       measureHint,

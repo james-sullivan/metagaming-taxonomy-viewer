@@ -1,4 +1,63 @@
 
+// ---- circle packing (faithful port of d3-hierarchy pack/enclose; shuffle omitted for
+// determinism — n is tiny here). cp_packEnclose(circles[{r}]) assigns x,y (centered on the
+// enclosing circle) and returns the enclosing radius. Used by the type/subtype circle graph.
+function cp_place(b,a,c){var dx=b.x-a.x,x,a2,dy=b.y-a.y,y,b2,d2=dx*dx+dy*dy;
+  if(d2){a2=a.r+c.r,a2*=a2;b2=b.r+c.r,b2*=b2;
+    if(a2>b2){x=(d2+b2-a2)/(2*d2);y=Math.sqrt(Math.max(0,b2/d2-x*x));c.x=b.x-x*dx-y*dy;c.y=b.y-x*dy+y*dx;}
+    else{x=(d2+a2-b2)/(2*d2);y=Math.sqrt(Math.max(0,a2/d2-x*x));c.x=a.x+x*dx-y*dy;c.y=a.y+x*dy+y*dx;}}
+  else{c.x=a.x+c.r;c.y=a.y;}}
+function cp_intersects(a,b){var dr=a.r+b.r-1e-6,dx=b.x-a.x,dy=b.y-a.y;return dr>0&&dr*dr>dx*dx+dy*dy;}
+function cp_score(node){var a=node._,b=node.next._,ab=a.r+b.r,dx=(a.x*b.r+b.x*a.r)/ab,dy=(a.y*b.r+b.y*a.r)/ab;return dx*dx+dy*dy;}
+function CpNode(c){this._=c;this.next=null;this.previous=null;}
+function cp_packEnclose(circles){var i,n=circles.length,a,b,c,j,k,sj,sk,aa,ca;
+  if(!n)return 0;
+  a=circles[0];a.x=0;a.y=0;if(!(n>1))return a.r;
+  b=circles[1];a.x=-b.r;b.x=a.r;b.y=0;if(!(n>2))return a.r+b.r;
+  cp_place(b,a,c=circles[2]);
+  a=new CpNode(a);b=new CpNode(b);c=new CpNode(c);
+  a.next=c.previous=b;b.next=a.previous=c;c.next=b.previous=a;
+  pack:for(i=3;i<n;++i){
+    cp_place(a._,b._,c=circles[i]);c=new CpNode(c);
+    j=b.next;k=a.previous;sj=b._.r;sk=a._.r;
+    do{ if(sj<=sk){ if(cp_intersects(j._,c._)){b=j;a.next=b;b.previous=a;--i;continue pack;} sj+=j._.r;j=j.next; }
+        else{ if(cp_intersects(k._,c._)){a=k;a.next=b;b.previous=a;--i;continue pack;} sk+=k._.r;k=k.previous; } }
+    while(j!==k.next);
+    c.previous=a;c.next=b;a.next=b.previous=b=c;
+    aa=cp_score(a);
+    while((c=c.next)!==b)if((ca=cp_score(c))<aa){a=c;aa=ca;}
+    b=a.next;
+  }
+  a=[b._];c=b;while((c=c.next)!==b)a.push(c._);
+  c=cp_enclose(a);
+  for(i=0;i<n;++i){a=circles[i];a.x-=c.x;a.y-=c.y;}
+  return c.r;}
+function cp_enclose(circles){var i=0,n=circles.length,B=[],p,e;
+  while(i<n){p=circles[i];if(e&&cp_enclosesWeak(e,p))++i;else{e=cp_encloseBasis(B=cp_extendBasis(B,p));i=0;}}
+  return e;}
+function cp_extendBasis(B,p){var i,j;
+  if(cp_enclosesWeakAll(p,B))return[p];
+  for(i=0;i<B.length;++i){if(cp_enclosesNot(p,B[i])&&cp_enclosesWeakAll(cp_encloseBasis2(B[i],p),B))return[B[i],p];}
+  for(i=0;i<B.length-1;++i){for(j=i+1;j<B.length;++j){
+    if(cp_enclosesNot(cp_encloseBasis2(B[i],B[j]),p)&&cp_enclosesNot(cp_encloseBasis2(B[i],p),B[j])&&cp_enclosesNot(cp_encloseBasis2(B[j],p),B[i])&&cp_enclosesWeakAll(cp_encloseBasis3(B[i],B[j],p),B))return[B[i],B[j],p];}}
+  throw new Error();}
+function cp_enclosesNot(a,b){var dr=a.r-b.r,dx=b.x-a.x,dy=b.y-a.y;return dr<0||dr*dr<dx*dx+dy*dy;}
+function cp_enclosesWeak(a,b){var dr=a.r-b.r+Math.max(a.r,b.r,1)*1e-9,dx=b.x-a.x,dy=b.y-a.y;return dr>0&&dr*dr>dx*dx+dy*dy;}
+function cp_enclosesWeakAll(a,B){for(var i=0;i<B.length;++i){if(!cp_enclosesWeak(a,B[i]))return false;}return true;}
+function cp_encloseBasis(B){switch(B.length){case 1:return cp_encloseBasis1(B[0]);case 2:return cp_encloseBasis2(B[0],B[1]);case 3:return cp_encloseBasis3(B[0],B[1],B[2]);}}
+function cp_encloseBasis1(a){return{x:a.x,y:a.y,r:a.r};}
+function cp_encloseBasis2(a,b){var x1=a.x,y1=a.y,r1=a.r,x2=b.x,y2=b.y,r2=b.r,x21=x2-x1,y21=y2-y1,r21=r2-r1,l=Math.sqrt(x21*x21+y21*y21);
+  return{x:(x1+x2+x21/l*r21)/2,y:(y1+y2+y21/l*r21)/2,r:(l+r1+r2)/2};}
+function cp_encloseBasis3(a,b,c){var x1=a.x,y1=a.y,r1=a.r,x2=b.x,y2=b.y,r2=b.r,x3=c.x,y3=c.y,r3=c.r,
+  a2=x1-x2,a3=x1-x3,b2=y1-y2,b3=y1-y3,c2=r2-r1,c3=r3-r1,
+  d1=x1*x1+y1*y1-r1*r1,d2=d1-x2*x2-y2*y2+r2*r2,d3=d1-x3*x3-y3*y3+r3*r3,
+  ab=a3*b2-a2*b3,
+  xa=(b2*d3-b3*d2)/(ab*2)-x1,xb=(b3*c2-b2*c3)/ab,
+  ya=(a3*d2-a2*d3)/(ab*2)-y1,yb=(a2*c3-a3*c2)/ab,
+  A=xb*xb+yb*yb-1,B=2*(r1+xa*xb+ya*yb),C=xa*xa+ya*ya-r1*r1,
+  r=-(Math.abs(A)>1e-6?(B+Math.sqrt(B*B-4*A*C))/(2*A):C/B);
+  return{x:x1+xa+xb*r,y:y1+ya+yb*r,r:r};}
+
 class Component extends DCLogic {
   state = { dataset:null, measure:null, modelGroup:'all', hiddenFams:{}, hiddenStages:{}, selFam:null, qStage:'all', scope:'all', accThr:70, openTx:null, openTxQuote:'', openTxOrig:'', openTxFam:'', openTxCw:'', hover:null, hx:0, hy:0, hw:0, hh:0 };
 
@@ -318,10 +377,74 @@ class Component extends DCLogic {
     yAxis.push(h('line',{key:'yaxis',x1:axisX,x2:axisX,y1:top,y2:baseY,stroke:'#D9D7D0',strokeWidth:1}));
     yAxis.push(h('text',{key:'ytitle',transform:'translate(20,'+(top+ph/2)+') rotate(-90)',textAnchor:'middle',style:{font:'9.5px "Spline Sans Mono",monospace',fill:'#B7B5AE',letterSpacing:'.1em'}}, yTitle));
     fk.unshift(...yAxis);
-    const flowChart=h('svg',{viewBox:`0 0 ${W} ${H}`,preserveAspectRatio:'xMidYMid meet',onMouseMove:this.onFlowMove,style:{position:'absolute',inset:0,width:'100%',height:'100%',overflow:'visible'}},fk);
+    let flowChart=h('svg',{viewBox:`0 0 ${W} ${H}`,preserveAspectRatio:'xMidYMid meet',onMouseMove:this.onFlowMove,style:{position:'absolute',inset:0,width:'100%',height:'100%',overflow:'visible'}},fk);
 
-    const flowSub = (share?'share of each stage’s verbalizations':rateMode?'metagaming quotes per transcript — height = rate':txRateMode?'% of transcripts with ≥1 quote in each family — one bar per family, not stacked':'absolute quote counts (height scaled to peak stage)') + ' · '+scopeShort;
-    const flowTitle = txRateMode?'Transcript coverage by family':'Composition by stage';
+    let flowSub = (share?'share of each stage’s verbalizations':rateMode?'metagaming quotes per transcript — height = rate':txRateMode?'% of transcripts with ≥1 quote in each family — one bar per family, not stacked':'absolute quote counts (height scaled to peak stage)') + ' · '+scopeShort;
+    let flowTitle = txRateMode?'Transcript coverage by family':'Composition by stage';
+
+    // ---------- type / subtype circle packing (replaces the stacked flow) ----------
+    // Each visible meta-entity (metagaming TYPE) is a circle; inside it, one sub-circle per
+    // implication cluster (SUBTYPE). Circle AREA ∝ quote count over the VISIBLE stages
+    // (pooled across benchmarks). Packed with d3's algorithm; the type circle is the smallest
+    // circle enclosing its subtype circles. Respects the family + stage checkboxes. Falls back
+    // to the stacked flow only if no visible family has clustered implications.
+    {
+      const CW=1320, CH=560, GAPF=0.16, EM=0.05;
+      const nodes=[];
+      order.forEach(f=>{
+        const named=(f.implications||[])
+          .map(im=>({ text:im.text, val:cols.reduce((s,c)=>s+((im.counts||[])[c]||0),0) }))
+          .filter(k=>k.val>0).sort((a,b)=>b.val-a.val);
+        const entTot=cols.reduce((s,c)=>s+((f.counts||[])[c]||0),0);
+        // include every visible type: named subtype circles + one muted "unclustered"
+        // remainder circle (quotes whose implication never formed a named cluster), so a
+        // type with few/no named subtypes still appears, sized by its full quote count.
+        const rem=entTot-named.reduce((s,k)=>s+k.val,0);
+        const kids=named.slice();
+        if(rem>0.5) kids.push({ text:'other / unclustered', val:rem, remainder:true });
+        if(!kids.length) return;
+        const circ=kids.map(k=>({ r:Math.sqrt(k.val)*(1+GAPF), data:k }));
+        const R=cp_packEnclose(circ);
+        nodes.push({ key:f.key, label:f.label, color:col(f.key), total:entTot, circ, R });
+      });
+      if(nodes.length){
+        const ecs=nodes.map(n=>({ r:n.R*(1+EM), node:n }));
+        const topR=cp_packEnclose(ecs);
+        const pad=20, s=Math.min(CW-2*pad, CH-2*pad)/(2*topR);
+        const CX=CW/2, CY=CH/2;
+        const totQ=nodes.reduce((a,n)=>a+n.total,0);
+        // denominator for prevalence readouts = gradeable transcripts over visible stages
+        const denom=cols.reduce((a,c)=>a+((T.stageSamples||[])[c]||0),0);
+        const els=[];
+        // draw largest types first so smaller ones (and their labels) sit on top
+        const draw=ecs.map((ec,i)=>({ec,i})).sort((p,q)=>q.ec.node.R-p.ec.node.R);
+        draw.forEach(({ec})=>{
+          const n=ec.node, ex=CX+ec.x*s, ey=CY+ec.y*s, eR=n.R*s;
+          const dim=st.selFam&&st.selFam!==n.key, on=st.selFam===n.key;
+          els.push(h('circle',{key:'e'+n.key,cx:ex.toFixed(1),cy:ey.toFixed(1),r:eR.toFixed(1),
+            fill:n.color,fillOpacity:dim?0.04:0.09,stroke:n.color,strokeOpacity:dim?0.3:(on?1:0.75),strokeWidth:on?2.4:1.3,
+            style:{cursor:'pointer'},onClick:()=>this.pickFam(n.key)},
+            h('title',{key:'t'},n.label+' — '+n.total+' quotes'+(denom?' · '+(100*n.total/denom).toFixed(1)+'% of transcripts':'')+' · '+n.circ.length+' subtypes')));
+          n.circ.forEach((cc,ci)=>{
+            const kx=ex+cc.x*s, ky=ey+cc.y*s, kr=(cc.r/(1+GAPF))*s, rem=cc.data.remainder;
+            els.push(h('circle',{key:'k'+n.key+ci,cx:kx.toFixed(1),cy:ky.toFixed(1),r:Math.max(1,kr).toFixed(1),
+              fill:rem?'#9E9C95':n.color,fillOpacity:dim?0.1:(rem?0.3:0.55),stroke:'#FBFAF8',strokeWidth:0.7,
+              style:{cursor:'pointer'},onClick:()=>this.pickFam(n.key)},
+              h('title',{key:'t'},rem?(n.label+' · other / unclustered — '+cc.data.val+' quotes'):(n.label+' · '+cc.data.text+' — '+cc.data.val+' quotes'))));
+            if(kr>=19 && !dim){ const fs=Math.min(12,Math.max(8.5,kr*0.32)), maxc=Math.max(3,Math.floor(kr/(fs*0.30))), lbl=rem?'other':cc.data.text;
+              els.push(h('text',{key:'kl'+n.key+ci,x:kx.toFixed(1),y:(ky+fs*0.34).toFixed(1),textAnchor:'middle',
+                style:{font:'600 '+fs.toFixed(1)+'px "Spline Sans",sans-serif',fill:rem?'#54534E':'#26261F',paintOrder:'stroke',stroke:'#FBFAF8',strokeWidth:'2.4px',pointerEvents:'none'}},
+                lbl.length>maxc?lbl.slice(0,maxc).trimEnd()+'…':lbl)); }
+          });
+          els.push(h('text',{key:'el'+n.key,x:ex.toFixed(1),y:(ey-eR+13).toFixed(1),textAnchor:'middle',
+            style:{font:'700 13px "Spline Sans",sans-serif',fill:dim?'#B7B5AE':n.color,paintOrder:'stroke',stroke:'#F6F5F2',strokeWidth:'3px',pointerEvents:'none',cursor:'pointer'},onClick:()=>this.pickFam(n.key)},n.label));
+        });
+        flowChart=h('svg',{viewBox:'0 0 '+CW+' '+CH,preserveAspectRatio:'xMidYMid meet',
+          style:{position:'absolute',inset:0,width:'100%',height:'100%',overflow:'visible'}},els);
+        flowTitle='Type & subtype composition';
+        flowSub='circle = a metagaming TYPE · inner circles = implication SUBTYPES (grey = unclustered) · area ∝ quotes over visible stages · '+scopeShort+' · '+totQ+' quotes';
+      }
+    }
 
     // ---------- tooltip ----------
     let hoverInfo='';

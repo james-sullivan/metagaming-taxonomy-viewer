@@ -444,13 +444,15 @@ class Component extends DCLogic {
             const pctOf=(v)=> stageTot? ' ('+(100*v/stageTot).toFixed(1)+'% of '+stageLabel+' quotes)' : '';
             els.push(h('circle',{key:'e'+idp,cx:ex.toFixed(1),cy:ey.toFixed(1),r:eR.toFixed(1),
               fill:n.color,fillOpacity:dim?0.04:0.09,stroke:n.color,strokeOpacity:dim?0.3:(on?1:0.75),strokeWidth:on?2.4:1.3,
-              style:{cursor:'pointer'},onClick:()=>this.pickFam(n.key)},
+              style:{cursor:'pointer'},onClick:()=>this.pickFam(n.key),
+              onMouseEnter:()=>this.setState({hover:{circ:true,color:n.color,label:n.label,l1:stageLabel+' · type · '+n.circ.length+' subtype'+(n.circ.length===1?'':'s'),l2:n.total+' quotes'+pctOf(n.total)+' · area ∝ quotes (common scale)'}})},
               h('title',{key:'t'},n.label+' · '+stageLabel+' — '+n.total+' quotes'+pctOf(n.total)+' · '+n.circ.length+' subtype'+(n.circ.length===1?'':'s')+'\n(circle area ∝ quote count; common scale across stages)')));
             n.circ.forEach((cc,ci)=>{
               const kx=ex+cc.x*s, ky=ey+cc.y*s, kr=(cc.r/(1+GAPF))*s, rem=cc.data.remainder;
               els.push(h('circle',{key:'k'+idp+'_'+ci,cx:kx.toFixed(1),cy:ky.toFixed(1),r:Math.max(1,kr).toFixed(1),
                 fill:rem?'#9E9C95':n.color,fillOpacity:dim?0.1:(rem?0.3:0.55),stroke:'#FBFAF8',strokeWidth:0.7,
-                style:{cursor:'pointer'},onClick:()=>this.pickFam(n.key)},
+                style:{cursor:'pointer'},onClick:()=>this.pickFam(n.key),
+                onMouseEnter:()=>this.setState({hover:{circ:true,color:rem?'#9E9C95':n.color,label:rem?'other / unclustered':cc.data.text,l1:n.label+' · '+stageLabel+(rem?' · subtype (unclustered)':' · subtype'),l2:cc.data.val+' quote'+(cc.data.val===1?'':'s')+pctOf(cc.data.val)+' · area ∝ quotes (common scale)'}})},
                 h('title',{key:'t'},(rem?(n.label+' · other / unclustered'):(n.label+' · '+cc.data.text))+' — '+cc.data.val+' quote'+(cc.data.val===1?'':'s')+pctOf(cc.data.val)+' · '+stageLabel+'\n(circle area ∝ quote count; common scale across stages)')));
               if(kr>=15 && !dim){
                 const raw=rem?'other':cc.data.text;
@@ -539,10 +541,13 @@ class Component extends DCLogic {
     if(st.selFam){ const f=T.families.find(x=>x.key===st.selFam); hoverInfo='selected · '+f.label; }
     let tipShow=false,tipX=0,tipY=0,tipTransform='translate(14px,14px)',tipColor='#888',tipLabel='',tipLine1='',tipLine2='';
     if(st.hover){
-      const f=T.families.find(x=>x.key===st.hover.f);
-      tipShow=true; tipX=st.hx; tipY=st.hy; tipColor=col(f.key); tipLabel=f.label;
+      tipShow=true; tipX=st.hx; tipY=st.hy;
       const flipX=st.hx>(st.hw-200), flipY=st.hy>(st.hh-66);
       tipTransform='translate('+(flipX?'calc(-100% - 14px)':'14px')+', '+(flipY?'calc(-100% - 14px)':'14px')+')';
+      if(st.hover.circ){ tipColor=st.hover.color; tipLabel=st.hover.label; tipLine1=st.hover.l1; tipLine2=st.hover.l2; }
+      else {
+      const f=T.families.find(x=>x.key===st.hover.f);
+      tipColor=col(f.key); tipLabel=f.label;
       if(st.hover.ribbon){ tipLine1='carries across the lineage'; tipLine2=scopeShort; }
       else { const c=st.hover.c; tipLine1=COLLBL[c]+(STAGES[c].is_reference?' · reference':' · stage');
         tipLine2 = rateMode
@@ -550,6 +555,7 @@ class Component extends DCLogic {
           : txRateMode
           ? (hasData(c)? fmtPct(EWTXRATE[f.key][c])+' of transcripts have a '+f.label.toLowerCase()+' quote' : 'no data')
           : ('n='+EFF[f.key][c]+'   ·   '+fmtPct(EFF[f.key][c]/(TOT[c]||1))+' of stage'); }
+      }
     }
 
     // ---------- detail panel ----------

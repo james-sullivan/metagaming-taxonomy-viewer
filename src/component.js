@@ -430,22 +430,28 @@ class Component extends DCLogic {
         const packs=cols.map(c=>packStage(c));
         if(packs.some(p=>p.ecs.length)){
           const NS2=cols.length, cellW=CW/NS2, cyc=(CH-LABH)/2;
-          // PER-CELL scale: each stage's pack fills its own cell, so circles are as large as
-          // possible (small stages no longer shrink under a common scale). Cross-stage magnitude
-          // lives in the "N quotes" label + the stacked-bars view.
+          // COMMON scale across every stage: one scale factor, derived from the largest stage's
+          // pack, is shared by all cells. Because every subtype radius is sqrt(count), a fixed
+          // scale means a circle's rendered AREA is proportional to its quote count in EVERY
+          // cell — a subtype with the same count draws the same size at any stage, so size is
+          // directly comparable left→right. The biggest stage fills its cell; smaller stages
+          // render proportionally smaller (rather than each stage stretching to fill its cell).
+          const maxTopR=Math.max(...packs.map(p=>p.topR||1e-9));
+          const s=Math.min(cellW*0.98, (CH-LABH)*0.98)/(2*maxTopR);
           const els=[];
-          const drawNode=(ec,cx,idp,dim,on,s)=>{
+          const drawNode=(ec,cx,idp,dim,on,stageLabel,stageTot)=>{
             const n=ec.node, ex=cx+ec.x*s, ey=cyc+ec.y*s, eR=n.R*s;
+            const pctOf=(v)=> stageTot? ' ('+(100*v/stageTot).toFixed(1)+'% of '+stageLabel+' quotes)' : '';
             els.push(h('circle',{key:'e'+idp,cx:ex.toFixed(1),cy:ey.toFixed(1),r:eR.toFixed(1),
               fill:n.color,fillOpacity:dim?0.04:0.09,stroke:n.color,strokeOpacity:dim?0.3:(on?1:0.75),strokeWidth:on?2.4:1.3,
               style:{cursor:'pointer'},onClick:()=>this.pickFam(n.key)},
-              h('title',{key:'t'},n.label+' — '+n.total+' quotes · '+n.circ.length+' subtypes')));
+              h('title',{key:'t'},n.label+' · '+stageLabel+' — '+n.total+' quotes'+pctOf(n.total)+' · '+n.circ.length+' subtype'+(n.circ.length===1?'':'s')+'\n(circle area ∝ quote count; common scale across stages)')));
             n.circ.forEach((cc,ci)=>{
               const kx=ex+cc.x*s, ky=ey+cc.y*s, kr=(cc.r/(1+GAPF))*s, rem=cc.data.remainder;
               els.push(h('circle',{key:'k'+idp+'_'+ci,cx:kx.toFixed(1),cy:ky.toFixed(1),r:Math.max(1,kr).toFixed(1),
                 fill:rem?'#9E9C95':n.color,fillOpacity:dim?0.1:(rem?0.3:0.55),stroke:'#FBFAF8',strokeWidth:0.7,
                 style:{cursor:'pointer'},onClick:()=>this.pickFam(n.key)},
-                h('title',{key:'t'},rem?(n.label+' · other / unclustered — '+cc.data.val+' quotes'):(n.label+' · '+cc.data.text+' — '+cc.data.val+' quotes'))));
+                h('title',{key:'t'},(rem?(n.label+' · other / unclustered'):(n.label+' · '+cc.data.text))+' — '+cc.data.val+' quote'+(cc.data.val===1?'':'s')+pctOf(cc.data.val)+' · '+stageLabel+'\n(circle area ∝ quote count; common scale across stages)')));
               if(kr>=15 && !dim){
                 const raw=rem?'other':cc.data.text;
                 const lw=raw.split(/\s+/), lbl=(!rem && lw.length>1 && lw[0].toLowerCase()===n.label.toLowerCase())?lw.slice(1).join(' '):raw;
@@ -462,8 +468,7 @@ class Component extends DCLogic {
           packs.forEach((p,pi)=>{
             const stg=cols[pi], cx=cellW*pi+cellW/2;
             if(pi>0) els.push(h('line',{key:'dv'+pi,x1:(cellW*pi).toFixed(1),x2:(cellW*pi).toFixed(1),y1:6,y2:(CH-LABH-2).toFixed(1),stroke:'#ECEAE4',strokeWidth:1}));
-            const s=Math.min(cellW*0.98, (CH-LABH)*0.98)/(2*(p.topR||1e-9));
-            p.ecs.slice().sort((a,b)=>b.node.R-a.node.R).forEach(ec=>{ const on=st.selFam===ec.node.key, dim=st.selFam&&!on; drawNode(ec,cx,pi+'_'+ec.node.key,dim,on,s); });
+            p.ecs.slice().sort((a,b)=>b.node.R-a.node.R).forEach(ec=>{ const on=st.selFam===ec.node.key, dim=st.selFam&&!on; drawNode(ec,cx,pi+'_'+ec.node.key,dim,on,COLLBL[stg],p.total); });
             const slab=cp_wrap(COLLBL[stg], Math.max(8,Math.floor(cellW/6.4)), 2);
             slab.forEach((ln,li)=> els.push(h('text',{key:'sl'+pi+'_'+li,x:cx.toFixed(1),y:(CH-LABH+15+li*12.5).toFixed(1),textAnchor:'middle',
               style:{font:(STAGES[stg].is_reference?'600 ':'700 ')+'11.5px "Spline Sans",sans-serif',fill:STAGES[stg].is_reference?'#8A8780':'#33332E'}},ln)));
@@ -473,7 +478,7 @@ class Component extends DCLogic {
           flowChart=h('svg',{viewBox:'0 0 '+CW+' '+CH,preserveAspectRatio:'xMidYMid meet',
             style:{position:'absolute',inset:0,width:'100%',height:'100%',overflow:'visible'}},els);
           flowTitle='Type & subtype composition across the lineage';
-          flowSub='one circle-pack per stage (left→right) · circle = TYPE, inner = SUBTYPE (grey = unclustered) · each pack fills its cell; N per stage below · '+scopeShort;
+          flowSub='one circle-pack per stage (left→right) · circle = TYPE, inner = SUBTYPE (grey = unclustered) · area ∝ quotes, common scale across stages (hover for counts) · N per stage below · '+scopeShort;
         }
       } else {
         // ----- nested stacked bars: one bar per stage; TYPE segments, SUBTYPE sub-slices -----

@@ -414,7 +414,12 @@ class Component extends DCLogic {
       };
 
       if(compView==='circles'){
-        const CW=1320, CH=560, LABH=40, GAPF=0.10, EM=0.03;
+        const CW=1320, LABH=40, GAPF=0.10, EM=0.03;
+        // Square-ish cells: cap the pack band at the cell WIDTH so a circular pack fills its
+        // cell vertically too (a circle can't fill a tall narrow cell — that left big vertical
+        // gaps). Shortening the viewBox also lets the SVG scale up to the container width, so
+        // the bubbles get bigger. Few wide columns fall back to 520 (already filled vertically).
+        const CH=LABH+Math.round(Math.max(180,Math.min(520, CW/Math.max(1,cols.length))));
         const packStage=(si)=>{
           const nodes=[];
           order.forEach(f=>{
@@ -623,7 +628,7 @@ class Component extends DCLogic {
           if(nPts>1){ const dv=item.rates[nPts-1]-item.rates[0];
             if(Math.abs(dv)<1e-9){arrow='→';} else if(dv>0){arrow='▲';aColor=selColor;} else {arrow='▼';aColor='#B0ADA6';} }
           return h('div',{key:'ir'+ii,style:{display:'flex',alignItems:'center',gap:'7px',padding:'2px 6px'}},[
-            h('span',{key:'t',title:item.disp,style:{flex:'1 1 auto',minWidth:0,fontSize:'11px',lineHeight:1.3,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},item.disp),
+            h('span',{key:'t',title:item.disp,style:{flex:'1 1 auto',minWidth:0,fontSize:'11px',lineHeight:1.25,overflow:'hidden',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',wordBreak:'break-word'}},item.disp),
             mkSpark(item),
             h('span',{key:'n',style:{flex:'none',width:'22px',textAlign:'right',fontFamily:"'Spline Sans Mono',monospace",fontSize:'9.5px',color:'#93918B',fontVariantNumeric:'tabular-nums'}},String(item.total)),
             h('span',{key:'a',style:{flex:'none',width:'11px',textAlign:'center',fontFamily:"'Spline Sans Mono',monospace",fontSize:'10px',color:aColor}},arrow),

@@ -138,7 +138,7 @@ class Component extends DCLogic {
     const dsId=isMulti ? ((this.state.dataset && TX.datasets[this.state.dataset]) ? this.state.dataset : TX.default) : null;
     const T=isMulti ? TX.datasets[dsId] : TX;
     const LMETA=isMulti ? (TX.lineages[dsId]||{}) : {};
-    if(!T) return { ready:false, hasSel:false, legend:[], benchGroups:[], flowChart:null, flowTitle:'Composition by stage', compViewChips:[], statQuotes:'', statResponses:'', statBenchmarks:'', detRows:[], detBench:[], detQuotes:[], detImpls:[], detImplsPanel:null, stageChips:[], stageToggles:[], lineageOptions:[], lineageChips:[], lineageShow:false, headerKicker:'Metagaming taxonomy', headerTitle:'How does the taxonomy of metagaming verbalizations change across post-training?', tipShow:false, flowMin:440, benchDescShow:false, benchDescTag:'', benchDescText:'', benchDescUrl:'', detClass:[], veaSplit:[], accBands:[], accThrChips:[], accReady:false, eaSub:'', veaColLbl:'', mgColLbl:'', veaSwatch:'#7A3E9A', mgSwatch:'#2C6E63', modelGroupChips:[], showAllFams:this.showAllFams, anyHidden:false, anyStageHidden:false, showAllStages:this.showAllStages, txOpen:false, txModel:'', txFamily:'', txEval:'', txSid:'', txQuote:'', txOrig:'', txHasOrig:false, txParts:[], closeTx:this.closeTx, onFlowMove:this.onFlowMove, onFlowLeave:this.onFlowLeave };
+    if(!T) return { ready:false, hasSel:false, legend:[], benchGroups:[], flowChart:null, flowTitle:'Composition by stage', compViewChips:[], statQuotes:'', statResponses:'', statBenchmarks:'', detRows:[], detBench:[], detQuotes:[], detImpls:[], detImplsPanel:null, stageChips:[], stageToggles:[], lineageOptions:[], lineageChips:[], lineageShow:false, headerKicker:'Metagaming taxonomy', headerTitle:'How does the taxonomy of metagaming verbalizations change across post-training?', tipShow:false, flowMin:440, benchDescShow:false, benchDescTag:'', benchDescText:'', benchDescUrl:'', detQuoteGroups:[], detClass:[], veaSplit:[], accBands:[], accThrChips:[], accReady:false, eaSub:'', veaColLbl:'', mgColLbl:'', veaSwatch:'#7A3E9A', mgSwatch:'#2C6E63', modelGroupChips:[], showAllFams:this.showAllFams, anyHidden:false, anyStageHidden:false, showAllStages:this.showAllStages, txOpen:false, txModel:'', txFamily:'', txEval:'', txSid:'', txQuote:'', txOrig:'', txHasOrig:false, txParts:[], txPrompt:'', txHasPrompt:false, closeTx:this.closeTx, onFlowMove:this.onFlowMove, onFlowLeave:this.onFlowLeave };
     const st=this.state, P=this.props||{};
     const measure = st.measure || P.defaultMeasure || 'rate';
     const share = measure==='share';
@@ -444,6 +444,7 @@ class Component extends DCLogic {
           const maxTopR=Math.max(...packs.map(p=>p.topR||1e-9));
           const s=Math.min(cellW*0.98, (CH-LABH)*0.98)/(2*maxTopR);
           const els=[];
+          const topLabels=[];   // entity names floated OUTSIDE small bubbles: drawn last, decluttered
           const drawNode=(ec,cx,idp,dim,on,stageLabel,stageTot)=>{
             const n=ec.node, ex=cx+ec.x*s, ey=cyc+ec.y*s, eR=n.R*s;
             const pctOf=(v)=> stageTot? ' ('+(100*v/stageTot).toFixed(1)+'% of '+stageLabel+' quotes)' : '';
@@ -453,13 +454,16 @@ class Component extends DCLogic {
               onMouseEnter:()=>this.setState({hover:{circ:true,color:n.color,label:n.label,l1:stageLabel+' · type · '+n.circ.length+' subtype'+(n.circ.length===1?'':'s'),l2:n.total+' quotes'+pctOf(n.total)+' · area ∝ quotes (common scale)'}})}));
             n.circ.forEach((cc,ci)=>{
               const kx=ex+cc.x*s, ky=ey+cc.y*s, kr=(cc.r/(1+GAPF))*s, rem=cc.data.remainder;
+              // sub-bubble display name: cluster text with the leading entity/type word stripped
+              // (same rule the visible bubble label uses), so the tooltip matches the bubble name.
+              const _lw=String(cc.data.text||'').split(/\s+/);
+              const kName=rem?'other / unclustered':((_lw.length>1 && _lw[0].toLowerCase()===String(n.label).toLowerCase())?_lw.slice(1).join(' '):cc.data.text);
               els.push(h('circle',{key:'k'+idp+'_'+ci,cx:kx.toFixed(1),cy:ky.toFixed(1),r:Math.max(1,kr).toFixed(1),
                 fill:rem?'#9E9C95':n.color,fillOpacity:dim?0.1:(rem?0.3:0.55),stroke:'#FBFAF8',strokeWidth:0.7,
                 style:{cursor:'pointer'},onClick:()=>this.pickFam(n.key),
-                onMouseEnter:()=>this.setState({hover:{circ:true,color:rem?'#9E9C95':n.color,label:rem?'other / unclustered':cc.data.text,l1:n.label+' · '+stageLabel+(rem?' · subtype (unclustered)':' · subtype'),l2:cc.data.val+' quote'+(cc.data.val===1?'':'s')+pctOf(cc.data.val)+' · area ∝ quotes (common scale)'}})}));
+                onMouseEnter:()=>this.setState({hover:{circ:true,color:rem?'#9E9C95':n.color,label:kName,l1:n.label+' · '+stageLabel+(rem?' · subtype (unclustered)':' · subtype'),l2:cc.data.val+' quote'+(cc.data.val===1?'':'s')+pctOf(cc.data.val)+' · area ∝ quotes (common scale)'}})}));
               if(kr>=15 && !dim){
-                const raw=rem?'other':cc.data.text;
-                const lw=raw.split(/\s+/), lbl=(!rem && lw.length>1 && lw[0].toLowerCase()===n.label.toLowerCase())?lw.slice(1).join(' '):raw;
+                const lbl=rem?'other':kName;
                 const fs=Math.min(13,Math.max(8,kr*0.26));
                 const cpl=Math.max(4,Math.floor(kr*1.5/(fs*0.53)));
                 const mxl=Math.max(1,Math.min(4,Math.floor(kr*1.55/(fs*1.12))));
@@ -467,11 +471,16 @@ class Component extends DCLogic {
                 lines.forEach((ln,li)=> els.push(h('text',{key:'kl'+idp+'_'+ci+'_'+li,x:kx.toFixed(1),y:(y0+li*lh).toFixed(1),textAnchor:'middle',
                   style:{font:'600 '+fs.toFixed(1)+'px "Spline Sans",sans-serif',fill:rem?'#54534E':'#26261F',paintOrder:'stroke',stroke:'#FBFAF8',strokeWidth:'2.2px',pointerEvents:'none'}},ln))); }
             });
-            // every entity bubble always shows its name: inside near the top when big enough,
-            // otherwise floated just above the circle so small entities are still labelled.
-            const elFs=Math.min(13,Math.max(9,eR*0.18)), elIn=eR>=24, elY=elIn?(ey-eR+13):(ey-eR-4);
-            els.push(h('text',{key:'el'+idp,x:ex.toFixed(1),y:elY.toFixed(1),textAnchor:'middle',
-              style:{font:'700 '+elFs.toFixed(1)+'px "Spline Sans",sans-serif',fill:dim?'#B7B5AE':n.color,paintOrder:'stroke',stroke:'#F6F5F2',strokeWidth:'3px',pointerEvents:'none',cursor:'pointer'},onClick:()=>this.pickFam(n.key)},n.label));
+            // every entity bubble always shows its name. Big circle: label inside near the top.
+            // Small circle: defer to topLabels so it is drawn last (on top of every bubble) with a
+            // pill background + collision declutter, instead of hiding under neighbouring data.
+            const elFs=Math.min(13,Math.max(9,eR*0.18));
+            if(eR>=24){
+              els.push(h('text',{key:'el'+idp,x:ex.toFixed(1),y:(ey-eR+13).toFixed(1),textAnchor:'middle',
+                style:{font:'700 '+elFs.toFixed(1)+'px "Spline Sans",sans-serif',fill:dim?'#B7B5AE':n.color,paintOrder:'stroke',stroke:'#F6F5F2',strokeWidth:'3px',pointerEvents:'none',cursor:'pointer'},onClick:()=>this.pickFam(n.key)},n.label));
+            } else {
+              topLabels.push({id:idp,fkey:n.key,x:ex,y:ey-eR-4,text:n.label,color:n.color,dim:dim,fs:elFs});
+            }
           };
           packs.forEach((p,pi)=>{
             const stg=cols[pi], cx=cellW*pi+cellW/2;
@@ -483,6 +492,28 @@ class Component extends DCLogic {
             els.push(h('text',{key:'sn'+pi,x:cx.toFixed(1),y:(CH-6).toFixed(1),textAnchor:'middle',
               style:{font:'10px "Spline Sans Mono",monospace',fill:'#A6A49D'}}, p.total+' quotes'));
           });
+          // draw the outside-the-bubble entity names last, on top of every bubble, each on an
+          // opaque pill; nudge colliding pills upward so the names never overlap other data.
+          if(topLabels.length){
+            topLabels.sort((a,b)=>a.x-b.x || a.y-b.y);
+            const placed=[];
+            topLabels.forEach(tl=>{
+              const w=Math.max(16, tl.text.length*tl.fs*0.56)+8, hgt=tl.fs+5;
+              let cy=Math.max(tl.fs+2, tl.y);
+              for(let it=0; it<60; it++){
+                const x0=tl.x-w/2, x1=tl.x+w/2, y0=cy-hgt, y1=cy+3;
+                if(!placed.some(q=> x0<q.x1 && x1>q.x0 && y0<q.y1 && y1>q.y0)) break;
+                cy-=hgt*0.92; if(cy<tl.fs+2){ cy=tl.fs+2; break; }
+              }
+              const x0=tl.x-w/2, x1=tl.x+w/2, y0=cy-hgt, y1=cy+3;
+              placed.push({x0,x1,y0,y1});
+              els.push(h('rect',{key:'elbg'+tl.id,x:x0.toFixed(1),y:(cy-tl.fs).toFixed(1),width:w.toFixed(1),height:(tl.fs+4).toFixed(1),rx:3,
+                fill:'#FFFFFF',fillOpacity:0.9,stroke:tl.dim?'#E4E2DC':tl.color,strokeOpacity:0.4,strokeWidth:0.8,
+                style:{cursor:'pointer'},onClick:()=>this.pickFam(tl.fkey)}));
+              els.push(h('text',{key:'ellb'+tl.id,x:tl.x.toFixed(1),y:cy.toFixed(1),textAnchor:'middle',
+                style:{font:'700 '+tl.fs.toFixed(1)+'px "Spline Sans",sans-serif',fill:tl.dim?'#B7B5AE':tl.color,pointerEvents:'none'}},tl.text));
+            });
+          }
           flowChart=h('svg',{viewBox:'0 0 '+CW+' '+CH,preserveAspectRatio:'xMidYMid meet',onMouseMove:this.onFlowMove,
             style:{position:'absolute',inset:0,width:'100%',height:'100%',overflow:'visible'}},els);
           flowTitle='Type & subtype composition across the lineage';
@@ -566,7 +597,7 @@ class Component extends DCLogic {
 
     // ---------- detail panel ----------
     const selFamObj = st.selFam ? T.families.find(f=>f.key===st.selFam) : null;
-    let detRows=[], detBench=[], detQuotes=[], stageChips=[], detClass=[], detImpls=[], detImplsPanel=null, selName='', selKicker='', selColor='#888', quoteCount='', moreQuotes='';
+    let detRows=[], detBench=[], detQuotes=[], detQuoteGroups=[], stageChips=[], detClass=[], detImpls=[], detImplsPanel=null, selName='', selKicker='', selColor='#888', quoteCount='', moreQuotes='';
     if(selFamObj){
       selColor=col(selFamObj.key);
       selName=selFamObj.label;
@@ -661,16 +692,29 @@ class Component extends DCLogic {
       // VEA badge (purple) on eval_aware quotes; shows the 0-100 accuracy when present.
       const veaBadgeStyle='font-family:\'Spline Sans Mono\',monospace;font-size:8.5px;font-weight:700;letter-spacing:.04em;color:#7A3E9A;background:#F0E6F7;padding:1px 5px;border-radius:3px';
       const hasTx=(tk)=> !!(T.transcripts && tk && (tk in T.transcripts));
-      detQuotes=filt.slice(0,16).map(q=>{ const showEv = evals ? q.ev.filter(e=>evals.includes(e)) : q.ev; const ev0=showEv[0]||q.ev[0];
+      const mapQ=(q)=>{ const showEv = evals ? q.ev.filter(e=>evals.includes(e)) : q.ev; const ev0=showEv[0]||q.ev[0];
         const badges=q.cols.filter(c=>c<NS).map(c=>({ label:COLLBL[c], style:badgeStyle(c) }));
         if(q.vea==='eval_aware') badges.push({ label:(q.acc!=null?'VEA '+q.acc:'VEA'), style:veaBadgeStyle });
         const tx=hasTx(q.tk);
         return { t:q.t, oq:q.oq||'', cw:q.cw||'', impl:q.impl||'', evLabel: elabel(ev0)+(showEv.length>1?' +'+(showEv.length-1):''), catColor:T.catColor[q.c]||'#999',
           badges, hasTx:tx, txHint: tx?'view transcript ↗':'',
           onClick: tx?(()=>this.showTx(q.tk,q.t,q.oq||q.t,selFamObj.label,q.cw||'')):(()=>{}),
-          rowCursor: tx?'pointer':'default' }; });
-      moreQuotes = filt.length>16 ? ('+ '+(filt.length-16)+' more (of '+filt.length+' sampled)') : '';
-      quoteCount = filt.length+' shown'+(st.qStage==='all'?'':' · '+COLLBL[st.qStage]);
+          rowCursor: tx?'pointer':'default' }; };
+      // group example verbalizations into a subsection per subtype/CATEGORY (cluster) within this
+      // family; strip the leading entity word from the heading like the bubble/impl labels.
+      const _catName=(c)=>{ const lw=String(c).split(/\s+/); return (lw.length>1 && lw[0].toLowerCase()===String(selFamObj.label).toLowerCase())?lw.slice(1).join(' '):c; };
+      const gmap=new Map();
+      filt.forEach(q=>{ let raw=(q.cat||'').trim(); if(!raw||raw==='general'||raw==='other / singletons') raw='__other__';
+        if(!gmap.has(raw)) gmap.set(raw,[]); gmap.get(raw).push(q); });
+      const PERCAT=6;
+      detQuoteGroups=[...gmap.entries()]
+        .map(([k,qs])=>({ key:k, name:k==='__other__'?'Other / unclustered':_catName(k), n:qs.length, quotes:qs }))
+        .sort((a,b)=> (a.key==='__other__'?1:0)-(b.key==='__other__'?1:0) || b.n-a.n)
+        .map(g=>({ cat:g.name, count:g.n+(g.n===1?' quote':' quotes'), quotes:g.quotes.slice(0,PERCAT).map(mapQ),
+                   more: g.n>PERCAT?('+ '+(g.n-PERCAT)+' more in this category'):'' }));
+      detQuotes=filt.slice(0,16).map(mapQ);   // retained for compatibility; template renders groups
+      moreQuotes='';
+      quoteCount = filt.length+' quotes · '+detQuoteGroups.length+' categor'+(detQuoteGroups.length===1?'y':'ies')+(st.qStage==='all'?'':' · '+COLLBL[st.qStage]);
       stageChips=['all',...cols].map(c=>{ const active=st.qStage===c; const lbl=c==='all'?'All':COLLBL[c];
         return { label:lbl, onClick:()=>this.setQStage(c),
           style:'font-family:\'Spline Sans Mono\',monospace;font-size:10px;padding:3px 9px;border-radius:5px;cursor:pointer;border:1px solid '+(active?'#2C6E63':'#DCD9D2')+';background:'+(active?'#2C6E63':'#FFFFFF')+';color:'+(active?'#FFFFFF':'#5C5B57') }; });
@@ -762,10 +806,12 @@ class Component extends DCLogic {
     const eaSub = scopeShort + (anyHidden ? ' · '+order.length+'/'+legendOrder.length+' families' : '');
 
     // ---------- source-transcript modal (quote -> transcript click) ----------
-    let txOpen=false, txModel='', txFamily='', txEval='', txSid='', txQuote='', txOrig='', txHasOrig=false, txParts=[], txCwParts=[], txHasCw=false;
+    let txOpen=false, txModel='', txFamily='', txEval='', txSid='', txQuote='', txOrig='', txHasOrig=false, txParts=[], txCwParts=[], txHasCw=false, txPrompt='', txHasPrompt=false;
     if(st.openTx && T.transcripts && (st.openTx in T.transcripts)){
       txOpen=true;
       const full=T.transcripts[st.openTx]||'';
+      // the prompt the subject actually saw (system+user), added to the bundle by the exporter
+      txPrompt=(T.prompts && T.prompts[st.openTx])||''; txHasPrompt=!!txPrompt.trim();
       txQuote=st.openTxQuote||'';
       const pp=st.openTx.split('::'), mdl=pp[0], evk=pp[1], sid=pp.slice(2).join('::');
       const stg=(T.stages||[]).find(s=>s.model===mdl), evo=(T.evals||[]).find(e=>e.key===evk);
@@ -808,10 +854,10 @@ class Component extends DCLogic {
       clearSel:this.clearSel, clearLabel:(st.selFam)?'clear':'',
       clearBtnStyle:'font-family:\'Spline Sans Mono\',monospace;font-size:9.5px;color:#2C6E63;background:none;border:none;cursor:pointer;padding:0;'+(st.selFam?'':'visibility:hidden'),
       hasSel:!!selFamObj,
-      selName, selKicker, selColor, detRows, detClass, detBench, detImpls, detImplsPanel, detQuotes, quoteCount, moreQuotes, stageChips,
+      selName, selKicker, selColor, detRows, detClass, detBench, detImpls, detImplsPanel, detQuotes, detQuoteGroups, quoteCount, moreQuotes, stageChips,
       lineageShow, lineageOptions, lineageChips, onLineageChange, headerKicker, headerTitle,
       stageToggles, anyStageHidden, showAllStages:this.showAllStages,
-      txOpen, txModel, txFamily, txEval, txSid, txQuote, txOrig, txHasOrig, txParts, txHasCw, txCwParts, closeTx:this.closeTx,
+      txOpen, txModel, txFamily, txEval, txSid, txQuote, txOrig, txHasOrig, txParts, txHasCw, txCwParts, txPrompt, txHasPrompt, closeTx:this.closeTx,
       tipShow, tipX, tipY, tipTransform, tipColor, tipLabel, tipLine1, tipLine2,
       onFlowMove:this.onFlowMove, onFlowLeave:this.onFlowLeave
     };

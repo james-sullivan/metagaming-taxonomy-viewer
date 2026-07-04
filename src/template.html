@@ -395,29 +395,39 @@ html,body{margin:0;height:100%;background:#F6F5F2}
             <button onclick="{{ s.onClick }}" style="{{ s.style }}">{{ s.label }}</button>
           </sc-for>
         </div>
-        <div style="display:flex;flex-direction:column;gap:8px">
-          <sc-for list="{{ detQuotes }}" as="q" hint-placeholder-count="6">
-            <div class="q-row" onclick="{{ q.onClick }}" style="border:1px solid #E8E6E0;border-radius:7px;padding:9px 10px;background:#FFFFFF;cursor:{{ q.rowCursor }}">
-              <div style="font-size:12px;line-height:1.45;color:#2A2A27">"{{ q.t }}"</div>
-              <sc-if value="{{ q.impl }}" hint-placeholder-val="{{ false }}">
-                <div style="font-size:10.5px;line-height:1.4;color:#4E9B86;margin-top:4px;font-style:italic">&#8594; {{ q.impl }}</div>
-              </sc-if>
-              <sc-if value="{{ q.cw }}" hint-placeholder-val="{{ false }}">
-                <div style="font-family:'Spline Sans Mono',monospace;font-size:9.5px;line-height:1.5;color:#8A8780;margin-top:6px;padding:5px 7px;background:#F6F5F2;border-radius:4px;white-space:pre-wrap;word-break:break-word">{{ q.cw }}</div>
-              </sc-if>
-              <div style="display:flex;align-items:center;gap:8px;margin-top:7px;flex-wrap:wrap">
-                <span style="flex:none;display:flex;align-items:center;gap:3px">
-                  <sc-for list="{{ q.badges }}" as="b" hint-placeholder-count="2">
-                    <span style="{{ b.style }}">{{ b.label }}</span>
-                  </sc-for>
-                </span>
-                <span style="font-family:'Spline Sans Mono',monospace;font-size:9px;color:#5C8A7E;margin-left:auto;font-weight:600">{{ q.txHint }}</span>
-                <span style="font-family:'Spline Sans Mono',monospace;font-size:9px;color:#A6A49D">{{ q.evLabel }}</span>
+        <div style="display:flex;flex-direction:column;gap:15px">
+          <sc-for list="{{ detQuoteGroups }}" as="g" hint-placeholder-count="4">
+            <div>
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:7px;padding-bottom:4px;border-bottom:1px solid #ECEAE4">
+                <span style="font-family:'Spline Sans',sans-serif;font-size:12px;font-weight:600;color:#33332E">{{ g.cat }}</span>
+                <span style="font-family:'Spline Sans Mono',monospace;font-size:9px;color:#B7B5AE;flex:none">{{ g.count }}</span>
               </div>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <sc-for list="{{ g.quotes }}" as="q" hint-placeholder-count="4">
+                  <div class="q-row" onclick="{{ q.onClick }}" style="border:1px solid #E8E6E0;border-radius:7px;padding:9px 10px;background:#FFFFFF;cursor:{{ q.rowCursor }}">
+                    <div style="font-size:12px;line-height:1.45;color:#2A2A27">"{{ q.t }}"</div>
+                    <sc-if value="{{ q.impl }}" hint-placeholder-val="{{ false }}">
+                      <div style="font-size:10.5px;line-height:1.4;color:#4E9B86;margin-top:4px;font-style:italic">&#8594; {{ q.impl }}</div>
+                    </sc-if>
+                    <sc-if value="{{ q.cw }}" hint-placeholder-val="{{ false }}">
+                      <div style="font-family:'Spline Sans Mono',monospace;font-size:9.5px;line-height:1.5;color:#8A8780;margin-top:6px;padding:5px 7px;background:#F6F5F2;border-radius:4px;white-space:pre-wrap;word-break:break-word">{{ q.cw }}</div>
+                    </sc-if>
+                    <div style="display:flex;align-items:center;gap:8px;margin-top:7px;flex-wrap:wrap">
+                      <span style="flex:none;display:flex;align-items:center;gap:3px">
+                        <sc-for list="{{ q.badges }}" as="b" hint-placeholder-count="2">
+                          <span style="{{ b.style }}">{{ b.label }}</span>
+                        </sc-for>
+                      </span>
+                      <span style="font-family:'Spline Sans Mono',monospace;font-size:9px;color:#5C8A7E;margin-left:auto;font-weight:600">{{ q.txHint }}</span>
+                      <span style="font-family:'Spline Sans Mono',monospace;font-size:9px;color:#A6A49D">{{ q.evLabel }}</span>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+              <sc-if value="{{ g.more }}" hint-placeholder-val="{{ false }}"><div style="font-family:'Spline Sans Mono',monospace;font-size:9px;color:#B7B5AE;margin-top:6px">{{ g.more }}</div></sc-if>
             </div>
           </sc-for>
         </div>
-        <sc-if value="{{ moreQuotes }}" hint-placeholder-val="{{ false }}"><div style="font-family:'Spline Sans Mono',monospace;font-size:9.5px;color:#B7B5AE;margin-top:10px;text-align:center">{{ moreQuotes }}</div></sc-if>
       </div>
     </aside></sc-if>
 
@@ -452,7 +462,11 @@ html,body{margin:0;height:100%;background:#F6F5F2}
         </sc-if>
       </div>
       <div style="overflow-y:auto;padding:15px 20px">
-        <div style="font-family:'Spline Sans Mono',monospace;font-size:8.5px;letter-spacing:.15em;text-transform:uppercase;color:#93918B;margin-bottom:9px">Full transcript &mdash; the highlighted span is the quote in context</div>
+        <sc-if value="{{ txHasPrompt }}" hint-placeholder-val="{{ false }}">
+          <div style="font-family:'Spline Sans Mono',monospace;font-size:8.5px;letter-spacing:.15em;text-transform:uppercase;color:#93918B;margin-bottom:9px">Prompt &mdash; what the model was asked</div>
+          <div style="font-family:'Spline Sans Mono',monospace;font-size:11.5px;line-height:1.65;color:#33332E;white-space:pre-wrap;word-break:break-word;background:#F1F4F8;border-left:3px solid #7C93B0;padding:10px 12px;border-radius:4px;margin-bottom:18px">{{ txPrompt }}</div>
+        </sc-if>
+        <div style="font-family:'Spline Sans Mono',monospace;font-size:8.5px;letter-spacing:.15em;text-transform:uppercase;color:#93918B;margin-bottom:9px">Model response &mdash; the highlighted span is the quote in context</div>
         <div style="font-family:'Spline Sans Mono',monospace;font-size:11.5px;line-height:1.65;color:#33332E;white-space:pre-wrap;word-break:break-word"><sc-for list="{{ txParts }}" as="p" hint-placeholder-count="3"><span style="{{ p.style }}">{{ p.text }}</span></sc-for></div>
       </div>
     </div>

@@ -590,11 +590,14 @@ class Component extends DCLogic {
       // scope-aware: per-eval counts when a benchmark filter is active, else pooled per-stage.
       const _svAt=(im,c)=> (evals && im.byEval) ? evals.reduce((a,e)=>a+(((im.byEval[e])||[])[c]||0),0) : ((im.counts||[])[c]||0);
       const _denAt=(c)=> evals ? evals.reduce((a,e)=>a+((T.sampleTotals[e]||[])[c]||0),0) : ((T.stageSamples||[])[c]||0);
+      // strip the leading entity name so these titles read like the bubble labels (which drop
+      // the first word when it repeats the type/entity name); e.g. "Source Expected Answer" -> "Expected Answer".
+      const _stripFam=(s)=>{ const lw=String(s).split(/\s+/); return (lw.length>1 && lw[0].toLowerCase()===String(selFamObj.label).toLowerCase())?lw.slice(1).join(' '):s; };
       const implItems=(selFamObj.implications||[]).map(im=>{
         const cs=cols.map(c=>_svAt(im,c));                 // per-VISIBLE-stage (aligned to cols), scope-aware
         const total=cs.reduce((a,v)=>a+v,0);
         const rates=cols.map((c,k)=>{ const d=_denAt(c); return d?cs[k]/d:0; });
-        return { text:im.text, total, cs, rates };
+        return { text:im.text, disp:_stripFam(im.text), total, cs, rates };
       }).filter(x=>x.total>0).sort((a,b)=>b.total-a.total).slice(0,14);
       detImpls=implItems;   // truthiness guard for the template section
       if(implItems.length){
@@ -612,7 +615,7 @@ class Component extends DCLogic {
             kids.push(h('path',{key:'l',d:line,fill:'none',stroke:selColor,strokeWidth:1.5,strokeLinejoin:'round',strokeLinecap:'round'})); }
           pts.forEach((p,k)=>{ const last=k===nPts-1;
             kids.push(h('circle',{key:'c'+k,cx:p[0].toFixed(1),cy:p[1].toFixed(1),r:last?2.4:1.5,fill:last?selColor:'#FFFFFF',stroke:selColor,strokeWidth:1})); });
-          kids.push(h('title',{key:'ti'},selFamObj.label+' · '+item.text+'\n'+cols.map((c,k)=>COLLBL[c]+': '+item.cs[k]+' quotes ('+item.rates[k].toFixed(3)+'/tx)').join('\n')));
+          kids.push(h('title',{key:'ti'},selFamObj.label+' · '+item.disp+'\n'+cols.map((c,k)=>COLLBL[c]+': '+item.cs[k]+' quotes ('+item.rates[k].toFixed(3)+'/tx)').join('\n')));
           return h('svg',{width:SW,height:SH,viewBox:'0 0 '+SW+' '+SH,style:{display:'block',flex:'none',overflow:'visible'}},kids);
         };
         const rows=implItems.map((item,ii)=>{
@@ -620,7 +623,7 @@ class Component extends DCLogic {
           if(nPts>1){ const dv=item.rates[nPts-1]-item.rates[0];
             if(Math.abs(dv)<1e-9){arrow='→';} else if(dv>0){arrow='▲';aColor=selColor;} else {arrow='▼';aColor='#B0ADA6';} }
           return h('div',{key:'ir'+ii,style:{display:'flex',alignItems:'center',gap:'7px',padding:'2px 6px'}},[
-            h('span',{key:'t',title:item.text,style:{flex:'1 1 auto',minWidth:0,fontSize:'11px',lineHeight:1.3,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},item.text),
+            h('span',{key:'t',title:item.disp,style:{flex:'1 1 auto',minWidth:0,fontSize:'11px',lineHeight:1.3,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},item.disp),
             mkSpark(item),
             h('span',{key:'n',style:{flex:'none',width:'22px',textAlign:'right',fontFamily:"'Spline Sans Mono',monospace",fontSize:'9.5px',color:'#93918B',fontVariantNumeric:'tabular-nums'}},String(item.total)),
             h('span',{key:'a',style:{flex:'none',width:'11px',textAlign:'center',fontFamily:"'Spline Sans Mono',monospace",fontSize:'10px',color:aColor}},arrow),

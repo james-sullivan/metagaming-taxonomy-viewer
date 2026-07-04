@@ -445,15 +445,13 @@ class Component extends DCLogic {
             els.push(h('circle',{key:'e'+idp,cx:ex.toFixed(1),cy:ey.toFixed(1),r:eR.toFixed(1),
               fill:n.color,fillOpacity:dim?0.04:0.09,stroke:n.color,strokeOpacity:dim?0.3:(on?1:0.75),strokeWidth:on?2.4:1.3,
               style:{cursor:'pointer'},onClick:()=>this.pickFam(n.key),
-              onMouseEnter:()=>this.setState({hover:{circ:true,color:n.color,label:n.label,l1:stageLabel+' · type · '+n.circ.length+' subtype'+(n.circ.length===1?'':'s'),l2:n.total+' quotes'+pctOf(n.total)+' · area ∝ quotes (common scale)'}})},
-              h('title',{key:'t'},n.label+' · '+stageLabel+' — '+n.total+' quotes'+pctOf(n.total)+' · '+n.circ.length+' subtype'+(n.circ.length===1?'':'s')+'\n(circle area ∝ quote count; common scale across stages)')));
+              onMouseEnter:()=>this.setState({hover:{circ:true,color:n.color,label:n.label,l1:stageLabel+' · type · '+n.circ.length+' subtype'+(n.circ.length===1?'':'s'),l2:n.total+' quotes'+pctOf(n.total)+' · area ∝ quotes (common scale)'}})}));
             n.circ.forEach((cc,ci)=>{
               const kx=ex+cc.x*s, ky=ey+cc.y*s, kr=(cc.r/(1+GAPF))*s, rem=cc.data.remainder;
               els.push(h('circle',{key:'k'+idp+'_'+ci,cx:kx.toFixed(1),cy:ky.toFixed(1),r:Math.max(1,kr).toFixed(1),
                 fill:rem?'#9E9C95':n.color,fillOpacity:dim?0.1:(rem?0.3:0.55),stroke:'#FBFAF8',strokeWidth:0.7,
                 style:{cursor:'pointer'},onClick:()=>this.pickFam(n.key),
-                onMouseEnter:()=>this.setState({hover:{circ:true,color:rem?'#9E9C95':n.color,label:rem?'other / unclustered':cc.data.text,l1:n.label+' · '+stageLabel+(rem?' · subtype (unclustered)':' · subtype'),l2:cc.data.val+' quote'+(cc.data.val===1?'':'s')+pctOf(cc.data.val)+' · area ∝ quotes (common scale)'}})},
-                h('title',{key:'t'},(rem?(n.label+' · other / unclustered'):(n.label+' · '+cc.data.text))+' — '+cc.data.val+' quote'+(cc.data.val===1?'':'s')+pctOf(cc.data.val)+' · '+stageLabel+'\n(circle area ∝ quote count; common scale across stages)')));
+                onMouseEnter:()=>this.setState({hover:{circ:true,color:rem?'#9E9C95':n.color,label:rem?'other / unclustered':cc.data.text,l1:n.label+' · '+stageLabel+(rem?' · subtype (unclustered)':' · subtype'),l2:cc.data.val+' quote'+(cc.data.val===1?'':'s')+pctOf(cc.data.val)+' · area ∝ quotes (common scale)'}})}));
               if(kr>=15 && !dim){
                 const raw=rem?'other':cc.data.text;
                 const lw=raw.split(/\s+/), lbl=(!rem && lw.length>1 && lw[0].toLowerCase()===n.label.toLowerCase())?lw.slice(1).join(' '):raw;

@@ -467,8 +467,11 @@ class Component extends DCLogic {
                 lines.forEach((ln,li)=> els.push(h('text',{key:'kl'+idp+'_'+ci+'_'+li,x:kx.toFixed(1),y:(y0+li*lh).toFixed(1),textAnchor:'middle',
                   style:{font:'600 '+fs.toFixed(1)+'px "Spline Sans",sans-serif',fill:rem?'#54534E':'#26261F',paintOrder:'stroke',stroke:'#FBFAF8',strokeWidth:'2.2px',pointerEvents:'none'}},ln))); }
             });
-            if(eR>=24) els.push(h('text',{key:'el'+idp,x:ex.toFixed(1),y:(ey-eR+13).toFixed(1),textAnchor:'middle',
-              style:{font:'700 '+Math.min(13,Math.max(10,eR*0.16)).toFixed(1)+'px "Spline Sans",sans-serif',fill:dim?'#B7B5AE':n.color,paintOrder:'stroke',stroke:'#F6F5F2',strokeWidth:'3px',pointerEvents:'none',cursor:'pointer'},onClick:()=>this.pickFam(n.key)},n.label));
+            // every entity bubble always shows its name: inside near the top when big enough,
+            // otherwise floated just above the circle so small entities are still labelled.
+            const elFs=Math.min(13,Math.max(9,eR*0.18)), elIn=eR>=24, elY=elIn?(ey-eR+13):(ey-eR-4);
+            els.push(h('text',{key:'el'+idp,x:ex.toFixed(1),y:elY.toFixed(1),textAnchor:'middle',
+              style:{font:'700 '+elFs.toFixed(1)+'px "Spline Sans",sans-serif',fill:dim?'#B7B5AE':n.color,paintOrder:'stroke',stroke:'#F6F5F2',strokeWidth:'3px',pointerEvents:'none',cursor:'pointer'},onClick:()=>this.pickFam(n.key)},n.label));
           };
           packs.forEach((p,pi)=>{
             const stg=cols[pi], cx=cellW*pi+cellW/2;

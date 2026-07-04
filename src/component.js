@@ -477,7 +477,7 @@ class Component extends DCLogic {
             els.push(h('text',{key:'sn'+pi,x:cx.toFixed(1),y:(CH-6).toFixed(1),textAnchor:'middle',
               style:{font:'10px "Spline Sans Mono",monospace',fill:'#A6A49D'}}, p.total+' quotes'));
           });
-          flowChart=h('svg',{viewBox:'0 0 '+CW+' '+CH,preserveAspectRatio:'xMidYMid meet',
+          flowChart=h('svg',{viewBox:'0 0 '+CW+' '+CH,preserveAspectRatio:'xMidYMid meet',onMouseMove:this.onFlowMove,
             style:{position:'absolute',inset:0,width:'100%',height:'100%',overflow:'visible'}},els);
           flowTitle='Type & subtype composition across the lineage';
           flowSub='one circle-pack per stage (left→right) · circle = TYPE, inner = SUBTYPE (grey = unclustered) · area ∝ quotes, common scale across stages (hover for counts) · N per stage below · '+scopeShort;

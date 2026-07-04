@@ -539,15 +539,36 @@ class Component extends DCLogic {
             els.push(h('line',{key:'yg'+i,x1:axX,x2:plotR,y1:y.toFixed(1),y2:y.toFixed(1),stroke:'#ECEAE4',strokeWidth:1,strokeDasharray:i?'2 5':'none'}));
             els.push(h('text',{key:'yl'+i,x:(axX-8).toFixed(1),y:(y+3).toFixed(1),textAnchor:'end',style:{font:'10px "Spline Sans Mono",monospace',fill:'#A6A49D'}}, share?Math.round(t*100)+'%':(+(t*axMax).toFixed(2)).toString())); });
           els.push(h('text',{key:'yt',transform:'translate(16,'+(top+ph2/2)+') rotate(-90)',textAnchor:'middle',style:{font:'9.5px "Spline Sans Mono",monospace',fill:'#B7B5AE',letterSpacing:'.1em'}}, share?'SHARE OF STAGE':'QUOTES / TRANSCRIPT'));
+          // pass 1: per-stage TYPE segment extents (top/bottom y per family) — for the flow ribbons.
+          const layout=stages2.map((s,k)=>{ const cx=cxOf(k); let y=baseY2; const segs=new Map();
+            s.fams.forEach(fm=>{ const segH=hOf(s,fm.total); segs.set(fm.key,{y0:y-segH,y1:y,total:fm.total,label:fm.label}); y-=segH; });
+            return { cx, segs }; });
+          // pass 2: FLOW ribbons between consecutive (non-reference) stages, one band per TYPE,
+          // drawn behind the bars so each type visibly flows stage→stage like the top chart.
+          const ribbon=(x1,a0,a1,x2,b0,b1)=>{ const mx=(x1+x2)/2; return `M${x1},${a0} C${mx},${a0} ${mx},${b0} ${x2},${b0} L${x2},${b1} C${mx},${b1} ${mx},${a1} ${x1},${a1} Z`; };
+          for(let k=0;k+1<stages2.length;k++){
+            if(STAGES[cols[k]].is_reference || STAGES[cols[k+1]].is_reference) continue;
+            const A=layout[k], B=layout[k+1];
+            order.forEach(f=>{ const a=A.segs.get(f.key), b=B.segs.get(f.key); if(!a||!b) return;
+              if((a.y1-a.y0)<0.5 && (b.y1-b.y0)<0.5) return;
+              const dim=st.selFam&&st.selFam!==f.key;
+              els.push(h('path',{key:'rb'+k+'_'+f.key,d:ribbon(A.cx+barW/2,a.y0,a.y1,B.cx-barW/2,b.y0,b.y1),
+                fill:col(f.key),opacity:dim?ribOp*0.2:ribOp,stroke:'none',style:{cursor:'pointer'},
+                onClick:()=>this.pickFam(f.key),
+                onMouseEnter:()=>this.setState({hover:{circ:true,color:col(f.key),label:a.label,l1:COLLBL[cols[k]]+' → '+COLLBL[cols[k+1]]+' · flow',l2:a.total+' → '+b.total+' quotes · type carried across stages'}})})); });
+          }
+          // pass 3: bars — subtype slices with the floating hover tooltip (matches the bubble chart).
           stages2.forEach((s,k)=>{
-            const cx=cxOf(k); let y=baseY2;
+            const cx=cxOf(k), stageLabel=COLLBL[cols[k]]; let y=baseY2;
             s.fams.forEach(fm=>{
-              const segH=hOf(s,fm.total), dim=st.selFam&&st.selFam!==fm.key; let yy=y;
-              fm.kids.forEach((cc,ci)=>{ const sliceH=segH*(cc.val/(fm.total||1));
+              const segH=hOf(s,fm.total), dim=st.selFam&&st.selFam!==fm.key, flow=String(fm.label).toLowerCase(); let yy=y;
+              fm.kids.forEach((cc,ci)=>{ const sliceH=segH*(cc.val/(fm.total||1)), rem=cc.remainder;
+                const lw=String(cc.text||'').split(/\s+/);
+                const kName=rem?'other / unclustered':((lw.length>1 && lw[0].toLowerCase()===flow)?lw.slice(1).join(' '):cc.text);
                 els.push(h('rect',{key:'b'+k+'_'+fm.key+'_'+ci,x:(cx-barW/2).toFixed(1),y:(yy-sliceH).toFixed(1),width:barW.toFixed(1),height:Math.max(0.4,sliceH).toFixed(1),
-                  fill:cc.remainder?'#9E9C95':fm.color,fillOpacity:dim?0.16:(cc.remainder?0.4:0.9),stroke:'#FBFAF8',strokeWidth:0.6,
-                  style:{cursor:'pointer'},onClick:()=>this.pickFam(fm.key)},
-                  h('title',{key:'t'}, fm.label+(cc.remainder?' · other / unclustered':' · '+cc.text)+' — '+cc.val+' quotes'+(s.tot?' ('+(100*cc.val/s.tot).toFixed(1)+'% of stage)':''))));
+                  fill:rem?'#9E9C95':fm.color,fillOpacity:dim?0.16:(rem?0.4:0.9),stroke:'#FBFAF8',strokeWidth:0.6,
+                  style:{cursor:'pointer'},onClick:()=>this.pickFam(fm.key),
+                  onMouseEnter:()=>this.setState({hover:{circ:true,color:rem?'#9E9C95':fm.color,label:kName,l1:fm.label+' · '+stageLabel+(rem?' · subtype (unclustered)':' · subtype'),l2:cc.val+' quote'+(cc.val===1?'':'s')+(s.tot?' ('+(100*cc.val/s.tot).toFixed(1)+'% of stage)':'')}})}));
                 yy-=sliceH; });
               y-=segH;
             });
@@ -561,10 +582,10 @@ class Component extends DCLogic {
               if(segH>=13){ const dim=st.selFam&&st.selFam!==fm.key;
                 els.push(h('text',{key:'fl'+fm.key,x:lx.toFixed(1),y:(yl-segH/2+3.5).toFixed(1),textAnchor:'start',style:{font:'600 11px "Spline Sans",sans-serif',fill:dim?'#B7B5AE':fm.color,cursor:'pointer'},onClick:()=>this.pickFam(fm.key)},fm.label)); }
               yl-=segH; }); }
-          flowChart=h('svg',{viewBox:'0 0 '+W2+' '+H2,preserveAspectRatio:'xMidYMid meet',
+          flowChart=h('svg',{viewBox:'0 0 '+W2+' '+H2,preserveAspectRatio:'xMidYMid meet',onMouseMove:this.onFlowMove,
             style:{position:'absolute',inset:0,width:'100%',height:'100%',overflow:'visible'}},els);
           flowTitle='Type & subtype composition across the lineage';
-          flowSub='stacked bars per stage (left→right) · segments = TYPES, sub-slices = SUBTYPES (grey = unclustered) · '+(share?'each stage = 100%':'height = quotes / transcript, common scale')+' · '+scopeShort;
+          flowSub='stacked bars per stage · segments = TYPES, sub-slices = SUBTYPES (grey = unclustered) · ribbons trace each type stage→stage · '+(share?'each stage = 100%':'height = quotes / transcript, common scale')+' · hover for counts · '+scopeShort;
         }
       }
     }

@@ -546,14 +546,17 @@ class Component extends DCLogic {
           // pass 2: FLOW ribbons between consecutive (non-reference) stages, one band per TYPE,
           // drawn behind the bars so each type visibly flows stage→stage like the top chart.
           const ribbon=(x1,a0,a1,x2,b0,b1)=>{ const mx=(x1+x2)/2; return `M${x1},${a0} C${mx},${a0} ${mx},${b0} ${x2},${b0} L${x2},${b1} C${mx},${b1} ${mx},${a1} ${x1},${a1} Z`; };
+          const ribOp2=Math.min(0.5, ribOp+0.16);   // bars-view ribbons read a touch stronger
           for(let k=0;k+1<stages2.length;k++){
             if(STAGES[cols[k]].is_reference || STAGES[cols[k+1]].is_reference) continue;
             const A=layout[k], B=layout[k+1];
             order.forEach(f=>{ const a=A.segs.get(f.key), b=B.segs.get(f.key); if(!a||!b) return;
               if((a.y1-a.y0)<0.5 && (b.y1-b.y0)<0.5) return;
               const dim=st.selFam&&st.selFam!==f.key;
-              els.push(h('path',{key:'rb'+k+'_'+f.key,d:ribbon(A.cx+barW/2,a.y0,a.y1,B.cx-barW/2,b.y0,b.y1),
-                fill:col(f.key),opacity:dim?ribOp*0.2:ribOp,stroke:'none',style:{cursor:'pointer'},
+              // tuck the ribbon ends ~2px UNDER each bar so the flow is visibly continuous with the
+              // segment (no anti-aliased seam at the exact bar edge that reads as an offset).
+              els.push(h('path',{key:'rb'+k+'_'+f.key,d:ribbon(A.cx+barW/2-2,a.y0,a.y1,B.cx-barW/2+2,b.y0,b.y1),
+                fill:col(f.key),opacity:dim?ribOp2*0.25:ribOp2,stroke:'none',style:{cursor:'pointer'},
                 onClick:()=>this.pickFam(f.key),
                 onMouseEnter:()=>this.setState({hover:{circ:true,color:col(f.key),label:a.label,l1:COLLBL[cols[k]]+' → '+COLLBL[cols[k+1]]+' · flow',l2:a.total+' → '+b.total+' quotes · type carried across stages'}})})); });
           }

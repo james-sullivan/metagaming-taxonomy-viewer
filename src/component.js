@@ -316,17 +316,14 @@ class Component extends DCLogic {
       const rt=val.reduce((s,e)=>s+((T.transcriptMgCounts[e]||[])[c]||0)/T.sampleTotals[e][c],0)/val.length;
       GRATE_TX=Math.max(GRATE_TX,rt);
     }});}
-    // stable axis max for the PER-FAMILY transcript rate (Tx% view) across all scopes + families
+    // axis max for the PER-FAMILY transcript rate (Tx% view). Scale to the CURRENT scope's
+    // per-family rates (EWTXRATE) so the tallest family bar fills the plot. Maxing across every
+    // single-benchmark scope (the way the stacked measures do) pinned this near 1.0 -- an entity
+    // can sit in ~100% of one safety benchmark's transcripts -- which shrank the default
+    // all-benchmarks bars to ~1/3 height. This stays stable across checkpoints + stage hiding
+    // (the base->post comparison that matters); scope switches rescale, and the scope is labeled.
     let GRATE_TXFAM=1e-9;
-    _SCOPES.forEach(ev=>{for(let c=0;c<NS;c++){
-      const act=ev||T.evals.map(e=>e.key);
-      const val=act.filter(e=>(T.sampleTotals[e]||[])[c]>0);
-      if(!val.length)continue;
-      order.forEach(f=>{
-        const rt=val.reduce((s,e)=>s+(((f.txByEval&&f.txByEval[e])||[])[c]||0)/T.sampleTotals[e][c],0)/val.length;
-        GRATE_TXFAM=Math.max(GRATE_TXFAM,rt);
-      });
-    }});
+    order.forEach(f=>{ for(const c of ALLC){ GRATE_TXFAM=Math.max(GRATE_TXFAM, EWTXRATE[f.key][c]||0); } });
     const niceCeil=(v)=>{ if(v<=0)return 1; const mg=Math.pow(10,Math.floor(Math.log10(v))); const n=v/mg; return mg*[1,1.2,1.5,2,2.5,3,4,5,6,8,10].find(x=>x>=n-1e-9); };
     const AXR_EW = niceCeil(GRATE_EW), AXR_TX = niceCeil(GRATE_TX), AXR_TXFAM = niceCeil(GRATE_TXFAM), AXR = niceCeil(GRATE), AXT = niceCeil(GTOT);
     const segH=(fkey,cnt,c)=> share?(cnt/(TOT[c]||1))*ph: rateMode?(EWRATE[fkey][c]/AXR_EW)*ph: txRateMode&&TXMGR?((TOT[c]>0?cnt/TOT[c]:0)*TXMGR[c]/AXR_TX)*ph: (cnt/AXT)*ph;

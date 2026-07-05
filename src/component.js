@@ -630,10 +630,11 @@ class Component extends DCLogic {
       const _vL=(selFamObj.veaLabeled||[]).reduce((a,b)=>a+b,0), _vE=(selFamObj.veaCount||[]).reduce((a,b)=>a+b,0);
       selKicker=sTot+' quotes across lineage · '+scopeShort+(_vL?' · '+Math.round(_vE/_vL*100)+'% VEA (of '+_vL+' labeled)':'');
       const famMaxRate=Math.max(...cols.map(c=>EWRATE[selFamObj.key][c]),1e-9);
-      detRows=cols.map(c=>{ const cnt=ec[c], shr=cnt/(TOT[c]||1), rr=EWRATE[selFamObj.key][c];
-        const big = share?fmtPct(shr): rateMode?(hasData(c)?fmtRate(rr)+' /tx':'—'): txRateMode?'—' : String(cnt);
-        const small = rateMode?('n='+cnt) : share?('n='+cnt):fmtPct(shr);
-        const bw = share?Math.min(1,shr) : rateMode?(rr/famMaxRate) : Math.min(1,shr);
+      const famMaxTxRate=Math.max(...cols.map(c=>EWTXRATE[selFamObj.key][c]),1e-9);
+      detRows=cols.map(c=>{ const cnt=ec[c], shr=cnt/(TOT[c]||1), rr=EWRATE[selFamObj.key][c], tr=EWTXRATE[selFamObj.key][c];
+        const big = share?fmtPct(shr): rateMode?(hasData(c)?fmtRate(rr)+' /tx':'—'): txRateMode?(hasData(c)?fmtPct(tr):'—') : String(cnt);
+        const small = rateMode?('n='+cnt) : txRateMode?('n='+cnt) : share?('n='+cnt):fmtPct(shr);
+        const bw = share?Math.min(1,shr) : rateMode?(rr/famMaxRate) : txRateMode?(tr/famMaxTxRate) : Math.min(1,shr);
         return { label:COLLBL[c], big, small, barW:(bw*100).toFixed(1)+'%', lblColor:STAGES[c].is_reference?'#A6A49D':'#46453F', barDash:STAGES[c].is_reference?'background-image:repeating-linear-gradient(90deg,'+selColor+' 0 5px,transparent 5px 8px);':'' }; });
       // eval-class makeup of this family per checkpoint (capability / safety / natural)
       const _evCat={}; T.evals.forEach(e=>_evCat[e.key]=e.cat);

@@ -524,7 +524,7 @@ class Component extends DCLogic {
         const W2=1320, H2=560, top=18, bot=64, axX=64, plotR=1298, ph2=H2-top-bot, baseY2=top+ph2;
         const share = measure==='share';
         const stages2=cols.map(si=>{
-          const fams=order.map(f=>{ const {kids,total}=subList(f,si); return { key:f.key, color:col(f.key), label:f.label, total, kids }; }).filter(x=>x.total>0);
+          const fams=order.map(f=>{ const {total}=subList(f,si); return { key:f.key, color:col(f.key), label:f.label, total }; }).filter(x=>x.total>0);
           return { si, fams, tot:fams.reduce((a,x)=>a+x.total,0), den:SAMP[si]||0 };
         });
         if(stages2.some(s=>s.tot>0)){
@@ -560,19 +560,15 @@ class Component extends DCLogic {
                 onClick:()=>this.pickFam(f.key),
                 onMouseEnter:()=>this.setState({hover:{circ:true,color:col(f.key),label:a.label,l1:COLLBL[cols[k]]+' → '+COLLBL[cols[k+1]]+' · flow',l2:a.total+' → '+b.total+' quotes · type carried across stages'}})})); });
           }
-          // pass 3: bars — subtype slices with the floating hover tooltip (matches the bubble chart).
+          // pass 3: bars — one solid segment per TYPE with the floating hover tooltip (matches the bubble chart).
           stages2.forEach((s,k)=>{
             const cx=cxOf(k), stageLabel=COLLBL[cols[k]]; let y=baseY2;
             s.fams.forEach(fm=>{
-              const segH=hOf(s,fm.total), dim=st.selFam&&st.selFam!==fm.key, flow=String(fm.label).toLowerCase(); let yy=y;
-              fm.kids.forEach((cc,ci)=>{ const sliceH=segH*(cc.val/(fm.total||1)), rem=cc.remainder;
-                const lw=String(cc.text||'').split(/\s+/);
-                const kName=rem?'other / unclustered':((lw.length>1 && lw[0].toLowerCase()===flow)?lw.slice(1).join(' '):cc.text);
-                els.push(h('rect',{key:'b'+k+'_'+fm.key+'_'+ci,x:(cx-barW/2).toFixed(1),y:(yy-sliceH).toFixed(1),width:barW.toFixed(1),height:Math.max(0.4,sliceH).toFixed(1),
-                  fill:rem?'#9E9C95':fm.color,fillOpacity:dim?0.16:(rem?0.4:0.9),stroke:'#FBFAF8',strokeWidth:0.6,
-                  style:{cursor:'pointer'},onClick:()=>this.pickFam(fm.key),
-                  onMouseEnter:()=>this.setState({hover:{circ:true,color:rem?'#9E9C95':fm.color,label:kName,l1:fm.label+' · '+stageLabel+(rem?' · subtype (unclustered)':' · subtype'),l2:cc.val+' quote'+(cc.val===1?'':'s')+(s.tot?' ('+(100*cc.val/s.tot).toFixed(1)+'% of stage)':'')}})}));
-                yy-=sliceH; });
+              const segH=hOf(s,fm.total), dim=st.selFam&&st.selFam!==fm.key;
+              els.push(h('rect',{key:'b'+k+'_'+fm.key,x:(cx-barW/2).toFixed(1),y:(y-segH).toFixed(1),width:barW.toFixed(1),height:Math.max(0.4,segH).toFixed(1),
+                fill:fm.color,fillOpacity:dim?0.16:0.88,stroke:'#FBFAF8',strokeWidth:0.6,
+                style:{cursor:'pointer'},onClick:()=>this.pickFam(fm.key),
+                onMouseEnter:()=>this.setState({hover:{circ:true,color:fm.color,label:fm.label,l1:stageLabel+' · type',l2:fm.total+' quote'+(fm.total===1?'':'s')+(s.tot?' ('+(100*fm.total/s.tot).toFixed(1)+'% of stage)':'')}})}));
               y-=segH;
             });
             const slab=cp_wrap(COLLBL[cols[k]], 18, 2);
@@ -587,8 +583,8 @@ class Component extends DCLogic {
               yl-=segH; }); }
           flowChart=h('svg',{viewBox:'0 0 '+W2+' '+H2,preserveAspectRatio:'xMidYMid meet',onMouseMove:this.onFlowMove,
             style:{position:'absolute',inset:0,width:'100%',height:'100%',overflow:'visible'}},els);
-          flowTitle='Type & subtype composition across the lineage';
-          flowSub='stacked bars per stage · segments = TYPES, sub-slices = SUBTYPES (grey = unclustered) · ribbons trace each type stage→stage · '+(share?'each stage = 100%':'height = quotes / transcript, common scale')+' · hover for counts · '+scopeShort;
+          flowTitle='Type composition across the lineage';
+          flowSub='stacked bars per stage · segments = TYPES · ribbons trace each type stage→stage · '+(share?'each stage = 100%':'height = quotes / transcript, common scale')+' · hover for counts · '+scopeShort;
         }
       }
     }

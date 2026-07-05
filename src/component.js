@@ -519,6 +519,40 @@ class Component extends DCLogic {
           flowTitle='Type & subtype composition across the lineage';
           flowSub='one circle-pack per stage (left→right) · circle = TYPE, inner = SUBTYPE (grey = unclustered) · area ∝ quotes, common scale across stages (hover for counts) · N per stage below · '+scopeShort;
         }
+      } else if(txRateMode){
+        // ----- Tx% grouped bars: one bar PER FAMILY per stage, NOT stacked. Tx% is independent
+        // per family (a transcript can match more than one), so it can't be summed into a
+        // stacked TYPE segment the way share/rate can — mirrors the top flow chart's Tx% layout.
+        const W2=1320, H2=560, top=18, bot=64, axX=64, plotR=1298, ph2=H2-top-bot, baseY2=top+ph2;
+        const N=cols.length;
+        const xL=axX+34, xR=plotR-90, cxOf=(k)=> N===1?(xL+xR)/2 : xL + k/(N-1)*(xR-xL);
+        const nf=order.length||1;
+        const GW=Math.min(140, 28*nf+14, 2*(xL-axX-20));
+        const innerGap=Math.max(1.5, Math.min(6, 54/nf));
+        const bw2=Math.max(3,(GW-innerGap*(nf-1))/nf);
+        if(cols.some(c=>hasData(c))){
+          const els=[];
+          [0,0.25,0.5,0.75,1].forEach((t,i)=>{ const y=baseY2 - t*ph2;
+            els.push(h('line',{key:'yg'+i,x1:axX,x2:plotR,y1:y.toFixed(1),y2:y.toFixed(1),stroke:'#ECEAE4',strokeWidth:1,strokeDasharray:i?'2 5':'none'}));
+            els.push(h('text',{key:'yl'+i,x:(axX-8).toFixed(1),y:(y+3).toFixed(1),textAnchor:'end',style:{font:'10px "Spline Sans Mono",monospace',fill:'#A6A49D'}}, Math.round(t*100)+'%')); });
+          els.push(h('text',{key:'yt',transform:'translate(16,'+(top+ph2/2)+') rotate(-90)',textAnchor:'middle',style:{font:'9.5px "Spline Sans Mono",monospace',fill:'#B7B5AE',letterSpacing:'.1em'}}, '% TRANSCRIPTS W/ FAMILY QUOTE'));
+          cols.forEach((c,k)=>{
+            const cx=cxOf(k), stageLabel=COLLBL[c], dataHere=hasData(c);
+            if(dataHere){ order.forEach((f,fi)=>{
+              const rt=EWTXRATE[f.key][c], hgt=(rt/AXR_TXFAM)*ph2;
+              const x=cx-GW/2+fi*(bw2+innerGap), dim=st.selFam&&st.selFam!==f.key;
+              els.push(h('rect',{key:'tb'+c+f.key,x:x.toFixed(1),y:(baseY2-hgt).toFixed(1),width:bw2.toFixed(1),height:Math.max(1,hgt).toFixed(1),
+                fill:col(f.key),opacity:dim?0.16:0.92,rx:1.5,style:{cursor:'pointer'},onClick:()=>this.pickFam(f.key),
+                onMouseEnter:()=>this.setState({hover:{circ:true,color:col(f.key),label:f.label,l1:stageLabel+' · type',l2:fmtPct(rt)+' of transcripts have a '+f.label.toLowerCase()+' quote'}})})); }); }
+            const slab=cp_wrap(stageLabel, 18, 2);
+            slab.forEach((ln,li)=> els.push(h('text',{key:'sx'+k+'_'+li,x:cx.toFixed(1),y:(baseY2+17+li*12).toFixed(1),textAnchor:'middle',style:{font:(STAGES[c].is_reference?'600 ':'700 ')+'11.5px "Spline Sans",sans-serif',fill:STAGES[c].is_reference?'#8A8780':'#33332E'}},ln)));
+            els.push(h('text',{key:'sc'+k,x:cx.toFixed(1),y:(baseY2+17+slab.length*12).toFixed(1),textAnchor:'middle',style:{font:'10px "Spline Sans Mono",monospace',fill:'#A6A49D'}}, dataHere?('n='+(SAMP[c]||0)+' tx'):'no data'));
+          });
+          flowChart=h('svg',{viewBox:'0 0 '+W2+' '+H2,preserveAspectRatio:'xMidYMid meet',onMouseMove:this.onFlowMove,
+            style:{position:'absolute',inset:0,width:'100%',height:'100%',overflow:'visible'}},els);
+          flowTitle='Transcript coverage by family';
+          flowSub='one group of bars per stage · height = % of transcripts with ≥1 quote in that family (equal-weighted across benchmarks) · independent per family, bars do not sum · '+scopeShort;
+        }
       } else {
         // ----- nested stacked bars: one bar per stage; TYPE segments, SUBTYPE sub-slices -----
         const W2=1320, H2=560, top=18, bot=64, axX=64, plotR=1298, ph2=H2-top-bot, baseY2=top+ph2;

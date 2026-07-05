@@ -289,6 +289,14 @@ class Component extends DCLogic {
     const _span=_slot[_slot.length-1]||1;
     const cxOf={}; cols.forEach((c,i)=>{ cxOf[c]= cols.length===1?(xL+xR)/2 : xL+(_slot[i]/_span)*(xR-xL); });
     const barW = cols.length>6?46:58;
+    // Tx% grouped bars are centered on their checkpoint column, but the shared cxOf pins the outer
+    // columns against the y-axis / right edge, which crushed group width into spindly bars. In Tx%
+    // mode use inset centers (gcxOf) that reserve room for half a group at each edge; the x-labels
+    // and caption route through CX() so they stay aligned. In other modes CX() === cxOf, so the
+    // shared axis rendering is unchanged.
+    const gHalf2=150, gLx=100+gHalf2, gRx=W-24-gHalf2;
+    const gcxOf={}; cols.forEach((c,i)=>{ gcxOf[c]= cols.length===1?(gLx+gRx)/2 : gLx+(_slot[i]/_span)*(gRx-gLx); });
+    const CX=(c)=> txRateMode?gcxOf[c]:cxOf[c];
     const maxTot=Math.max(...cols.map(c=>TOT[c]),1);
     // fixed global scale: largest possible stacked bar across EVERY scope, so the y-axis stays consistent when filtering
     const _SCOPES=[null, ...T.catOrder.map(c=>T.evals.filter(e=>e.cat===c).map(e=>e.key)), ...T.evals.map(e=>[e.key])];
@@ -337,13 +345,15 @@ class Component extends DCLogic {
       // Each bar = fraction of transcripts with >=1 quote in that family. Bars are
       // independent (a transcript can fall in several families) so they don't stack.
       const nf=order.length||1;
-      // group width within a checkpoint, clamped so the leftmost group stays right of the y-axis.
-      const GW=Math.min(140, 28*nf+14, 2*(cxOf[cols[0]]-96));
-      const innerGap=Math.max(1.5, Math.min(6, 54/nf));
-      const bw2=Math.max(3,(GW-innerGap*(nf-1))/nf);
+      // group width = most of the inter-group spacing (bounded), so bars fill the room the inset
+      // centers create instead of the old ~108px clamp against the y-axis.
+      let gspace=gRx-gLx; for(let i=1;i<cols.length;i++) gspace=Math.min(gspace, Math.abs(gcxOf[cols[i]]-gcxOf[cols[i-1]]));
+      const GW=Math.min(2*gHalf2, 46*nf+16, 0.82*gspace);
+      const innerGap=Math.max(2, Math.min(10, 90/nf));
+      const bw2=Math.max(6,(GW-innerGap*(nf-1))/nf);
       cols.forEach(c=>{ if(!hasData(c))return; order.forEach((f,fi)=>{
         const rt=EWTXRATE[f.key][c], hgt=(rt/AXR_TXFAM)*ph;
-        const x=cxOf[c]-GW/2+fi*(bw2+innerGap);
+        const x=CX(c)-GW/2+fi*(bw2+innerGap);
         const dim=st.selFam&&st.selFam!==f.key, hov=st.hover&&st.hover.f===f.key&&st.hover.c===c;
         fk.push(h('rect',{key:'tb'+c+f.key,x:x,y:baseY-hgt,width:bw2,height:Math.max(1,hgt),fill:col(f.key),opacity:dim?0.16:(hov?1:0.92),rx:1.5,style:{cursor:'pointer'},onClick:()=>this.pickFam(f.key),onMouseEnter:()=>this.setState({hover:{f:f.key,c}}),onMouseLeave:()=>this.setState({hover:null})}));
       }); });
@@ -359,24 +369,24 @@ class Component extends DCLogic {
     // off-lineage divider + label (only when both lineage and reference columns are visible)
     const linVis=cols.filter(c=>!STAGES[c].is_reference);
     const refVis=cols.filter(c=>STAGES[c].is_reference);
-    if(linVis.length && refVis.length){ const qd=(cxOf[linVis[linVis.length-1]]+cxOf[refVis[0]])/2;
+    if(linVis.length && refVis.length){ const qd=(CX(linVis[linVis.length-1])+CX(refVis[0]))/2;
       fk.push(h('line',{key:'qd',x1:qd,x2:qd,y1:top-2,y2:baseY+36,stroke:'#D9D7D0',strokeWidth:1,strokeDasharray:'2 5'}));
-      const refMid=(cxOf[refVis[0]]+cxOf[refVis[refVis.length-1]])/2;
+      const refMid=(CX(refVis[0])+CX(refVis[refVis.length-1]))/2;
       fk.push(h('text',{key:'qt',x:refMid,y:top+12,textAnchor:'middle',style:{font:'11px "Spline Sans Mono",monospace',fill:'#B7B5AE',letterSpacing:'.12em'}},'OFF-LINEAGE')); }
     cols.forEach(c=>{ const isRef=STAGES[c].is_reference;
-      fk.push(h('text',{key:'xl'+c,x:cxOf[c],y:baseY+27,textAnchor:'middle',style:{font:(isRef?'600 13px':'600 17px')+' "Spline Sans",sans-serif',fill: isRef?'#8A8780':'#1D1D1B'}}, COLLBL[c]));
+      fk.push(h('text',{key:'xl'+c,x:CX(c),y:baseY+27,textAnchor:'middle',style:{font:(isRef?'600 13px':'600 17px')+' "Spline Sans",sans-serif',fill: isRef?'#8A8780':'#1D1D1B'}}, COLLBL[c]));
       const sub = rateMode?(hasData(c)?fmtRate(EWRTOT[c])+' /tx':'no data'): txRateMode?(TXMGR&&hasData(c)?fmtPct(TXMGR[c])+' any mg':'no data'): ('n='+TOT[c]);
-      fk.push(h('text',{key:'xn'+c,x:cxOf[c],y:baseY+43,textAnchor:'middle',style:{font:(rateMode?'600 12.5px':'12px')+' "Spline Sans Mono",monospace',fill: (rateMode||txRateMode)?'#46453F':'#A6A49D'}}, sub));
-      if(rateMode||txRateMode) fk.push(h('text',{key:'xs'+c,x:cxOf[c],y:baseY+55,textAnchor:'middle',style:{font:'10px "Spline Sans Mono",monospace',fill:'#B7B5AE'}}, SAMP[c]?(rateMode?(TOT[c]+' / '+SAMP[c]):('n='+SAMP[c]+' tx')):'')); });
+      fk.push(h('text',{key:'xn'+c,x:CX(c),y:baseY+43,textAnchor:'middle',style:{font:(rateMode?'600 12.5px':'12px')+' "Spline Sans Mono",monospace',fill: (rateMode||txRateMode)?'#46453F':'#A6A49D'}}, sub));
+      if(rateMode||txRateMode) fk.push(h('text',{key:'xs'+c,x:CX(c),y:baseY+55,textAnchor:'middle',style:{font:'10px "Spline Sans Mono",monospace',fill:'#B7B5AE'}}, SAMP[c]?(rateMode?(TOT[c]+' / '+SAMP[c]):('n='+SAMP[c]+' tx')):'')); });
     // ---------- x axis caption: Olmo 3 post-training lineage ----------
-    if(linVis.length>=2){ const xb0=cxOf[linVis[0]]-barW/2, xb3=cxOf[linVis[linVis.length-1]]+barW/2, yb=baseY+68, xmid=(cxOf[linVis[0]]+cxOf[linVis[linVis.length-1]])/2;
+    if(linVis.length>=2){ const xb0=CX(linVis[0])-barW/2, xb3=CX(linVis[linVis.length-1])+barW/2, yb=baseY+68, xmid=(CX(linVis[0])+CX(linVis[linVis.length-1]))/2;
       const axisCap=(LMETA.axisCaption||'OLMo 3 post-training checkpoints').toUpperCase();
       fk.push(h('path',{key:'xbr',d:`M${xb0},${yb-5} L${xb0},${yb} L${xb3},${yb} L${xb3},${yb-5}`,fill:'none',stroke:'#D4D1CA',strokeWidth:1}));
       fk.push(h('text',{key:'xbt',x:xmid,y:yb+15,textAnchor:'middle',style:{font:'600 10.5px "Spline Sans Mono",monospace',fill:'#7A7872',letterSpacing:'.12em'}},axisCap)); }
     // ---------- y axis ----------
     const axisMax = share?1: rateMode?AXR_EW: txRateMode?AXR_TXFAM: AXT;
     const yOf = (v)=> baseY - (axisMax ? (v/axisMax)*ph : 0);
-    const axisX = 92, lastCx = cxOf[cols[cols.length-1]], gridX2 = lastCx + barW/2;
+    const axisX = 92, lastCx = CX(cols[cols.length-1]), gridX2 = lastCx + barW/2;
     const fmtY = (v)=> (share||txRateMode)?Math.round(v*100)+'%': rateMode?(+v.toFixed(2)).toString(): String(Math.round(v));
     const yTitle = (share?'% of stage': rateMode?'quotes / transcript': txRateMode?'% transcripts w/ family quote':'quote count').toUpperCase();
     const yAxis=[];
@@ -523,11 +533,16 @@ class Component extends DCLogic {
         // stacked TYPE segment the way share/rate can — mirrors the top flow chart's Tx% layout.
         const W2=1320, H2=560, top=18, bot=64, axX=64, plotR=1298, ph2=H2-top-bot, baseY2=top+ph2;
         const N=cols.length;
-        const xL=axX+34, xR=plotR-90, cxOf=(k)=> N===1?(xL+xR)/2 : xL + k/(N-1)*(xR-xL);
         const nf=order.length||1;
-        const GW=Math.min(140, 28*nf+14, 2*(xL-axX-20));
-        const innerGap=Math.max(1.5, Math.min(6, 54/nf));
-        const bw2=Math.max(3,(GW-innerGap*(nf-1))/nf);
+        // Reserve room for half a group at each edge so the outer groups aren't crushed against
+        // the axis (the old xL hugged it, forcing ~3px bars). Group width then uses most of the
+        // inter-column spacing.
+        const gHalf=Math.min(150,(plotR-axX-40)/2);
+        const xL=axX+20+gHalf, xR=plotR-14-gHalf, cxOf=(k)=> N===1?(xL+xR)/2 : xL + k/(N-1)*(xR-xL);
+        let gspace=xR-xL; for(let k=1;k<N;k++) gspace=Math.min(gspace, Math.abs(cxOf(k)-cxOf(k-1)));
+        const GW=Math.min(2*gHalf, 46*nf+16, 0.82*gspace);
+        const innerGap=Math.max(2, Math.min(10, 90/nf));
+        const bw2=Math.max(6,(GW-innerGap*(nf-1))/nf);
         if(cols.some(c=>hasData(c))){
           const els=[];
           [0,0.25,0.5,0.75,1].forEach((t,i)=>{ const y=baseY2 - t*ph2;

@@ -68,6 +68,29 @@ function cp_wrap(text,maxChars,maxLines){
   if(last.length>maxChars-1)last=last.slice(0,maxChars-1).replace(/\s+$/,'');
   kept[maxLines-1]=last+'…';return kept;}
 
+// Locate the quote span inside a transcript for highlighting. Returns [index, length]
+// (or [-1,0] if not found). Tiers, most→least precise:
+//   1. exact substring
+//   2. whitespace-tolerant regex — the mined `original_quote` is near-verbatim but the
+//      extraction LLM often normalizes whitespace (collapses newlines/runs to single
+//      spaces), so runs of whitespace in the needle are matched as \s+; the highlighted
+//      span uses the ACTUAL matched text length, not the needle's.
+//   3. 40-char prefix probe — catches truncation (needle longer than what's in the
+//      transcript) or a divergence past the first 40 chars.
+function tx_findSpan(full, needle){
+  if(!full || !needle) return [-1,0];
+  var i = full.indexOf(needle);
+  if(i>=0) return [i, needle.length];
+  var trimmed = needle.trim();
+  if(trimmed){
+    var esc = trimmed.replace(/[.*+?^${}()|[\]\\]/g,'\\$&').replace(/\s+/g,'\\s+');
+    try{ var m = new RegExp(esc).exec(full); if(m) return [m.index, m[0].length]; }catch(e){}
+  }
+  var probe = needle.slice(0,40);
+  if(probe){ i = full.indexOf(probe); if(i>=0) return [i, Math.min(needle.length,40)]; }
+  return [-1,0];
+}
+
 class Component extends DCLogic {
   state = { dataset:null, measure:null, modelGroup:'all', hiddenFams:{}, hiddenStages:{}, selFam:null, qStage:'all', implFilter:null, scope:'all', accThr:70, veaOnly:false, openTx:null, openTxQuote:'', openTxOrig:'', openTxFam:'', openTxCw:'', hover:null, hx:0, hy:0, hw:0, hh:0 };
 
@@ -151,7 +174,7 @@ class Component extends DCLogic {
     const dsId=isMulti ? ((this.state.dataset && TX.datasets[this.state.dataset]) ? this.state.dataset : TX.default) : null;
     const T=isMulti ? TX.datasets[dsId] : TX;
     const LMETA=isMulti ? (TX.lineages[dsId]||{}) : {};
-    if(!T) return { ready:false, hasSel:false, legend:[], benchGroups:[], flowChart:null, flowTitle:'Composition by stage', compViewChips:[], statQuotes:'', statResponses:'', statBenchmarks:'', detRows:[], detBench:[], detQuotes:[], detImpls:[], detImplsPanel:null, stageChips:[], stageToggles:[], lineageOptions:[], lineageChips:[], lineageShow:false, headerKicker:'Metagaming taxonomy', headerTitle:'How does the taxonomy of metagaming verbalizations change across post-training?', tipShow:false, flowMin:440, benchDescShow:false, benchDescTag:'', benchDescText:'', benchDescUrl:'', detQuoteGroups:[], implFilterChip:null, detClass:[], veaSplit:[], accBands:[], accThrChips:[], accReady:false, eaSub:'', veaColLbl:'', mgColLbl:'', veaSwatch:'#7A3E9A', mgSwatch:'#2C6E63', modelGroupChips:[], showAllFams:this.showAllFams, anyHidden:false, anyStageHidden:false, showAllStages:this.showAllStages, veaAvailable:false, veaAllBtnStyle:'', veaOnlyBtnStyle:'', veaScopeHint:'', setVeaAll:this.setVeaAll, setVeaOnly:this.setVeaOnly, txOpen:false, txModel:'', txFamily:'', txEval:'', txSid:'', txQuote:'', txOrig:'', txHasOrig:false, txParts:[], txPrompt:'', txHasPrompt:false, closeTx:this.closeTx, onFlowMove:this.onFlowMove, onFlowLeave:this.onFlowLeave };
+    if(!T) return { ready:false, hasSel:false, legend:[], benchGroups:[], flowChart:null, flowTitle:'Composition by stage', compViewChips:[], statQuotes:'', statResponses:'', statBenchmarks:'', detRows:[], detBench:[], detQuotes:[], detImpls:[], detImplsPanel:null, stageChips:[], stageToggles:[], lineageOptions:[], lineageChips:[], lineageShow:false, headerKicker:'Metagaming taxonomy', headerTitle:'How does the taxonomy of metagaming verbalizations change across post-training?', tipShow:false, flowMin:440, benchDescShow:false, benchDescTag:'', benchDescText:'', benchDescUrl:'', detQuoteGroups:[], implFilterChip:null, detClass:[], veaSplit:[], accBands:[], accThrChips:[], accReady:false, eaSub:'', veaColLbl:'', mgColLbl:'', veaSwatch:'#7A3E9A', mgSwatch:'#2C6E63', modelGroupChips:[], showAllFams:this.showAllFams, anyHidden:false, anyStageHidden:false, showAllStages:this.showAllStages, veaAvailable:false, veaAllBtnStyle:'', veaOnlyBtnStyle:'', veaScopeHint:'', setVeaAll:this.setVeaAll, setVeaOnly:this.setVeaOnly, txOpen:false, txModel:'', txFamily:'', txEval:'', txSid:'', txQuote:'', txOrig:'', txHasOrig:false, txParts:[], txPrompt:'', txHasPrompt:false, txNotFound:false, closeTx:this.closeTx, onFlowMove:this.onFlowMove, onFlowLeave:this.onFlowLeave };
     const st=this.state, P=this.props||{};
     const measure = st.measure || P.defaultMeasure || 'rate';
     const share = measure==='share';
@@ -919,7 +942,7 @@ class Component extends DCLogic {
     const eaSub = scopeShort + (anyHidden ? ' · '+order.length+'/'+legendOrder.length+' families' : '');
 
     // ---------- source-transcript modal (quote -> transcript click) ----------
-    let txOpen=false, txModel='', txFamily='', txEval='', txSid='', txQuote='', txOrig='', txHasOrig=false, txParts=[], txCwParts=[], txHasCw=false, txPrompt='', txHasPrompt=false;
+    let txOpen=false, txModel='', txFamily='', txEval='', txSid='', txQuote='', txOrig='', txHasOrig=false, txParts=[], txCwParts=[], txHasCw=false, txPrompt='', txHasPrompt=false, txNotFound=false;
     if(st.openTx && T.transcripts && (st.openTx in T.transcripts)){
       txOpen=true;
       const full=T.transcripts[st.openTx]||'';
@@ -932,12 +955,15 @@ class Component extends DCLogic {
       // header shows BOTH the cleaned/clustering phrase and the verbatim original;
       // only surface the original box when it actually differs from the cleaned form.
       txOrig=st.openTxOrig||''; txHasOrig = !!txOrig && txOrig!==txQuote;
-      // best-effort highlight using the VERBATIM quote (openTxOrig); fall back to the
-      // cleaned display text, then to a 40-char prefix probe.
+      // best-effort highlight using the VERBATIM quote (openTxOrig); tx_findSpan tolerates
+      // whitespace normalization and falls back to a 40-char prefix probe.
       const hl='background:#FFF1A8;color:#23231F;font-weight:600;border-radius:2px';
       const needle=st.openTxOrig||txQuote;
-      let idx = needle ? full.indexOf(needle) : -1, qlen = needle.length;
-      if(idx<0 && needle){ const probe=needle.slice(0,40); if(probe){ idx=full.indexOf(probe); qlen=Math.min(needle.length,40); } }
+      const [idx, qlen] = tx_findSpan(full, needle);
+      // ~6% of mined quotes can't be auto-located: the extraction LLM paraphrased the quote
+      // (not byte-verbatim), or it sits past the transcript's 60k-char display cap. Flag it so
+      // the modal says so, instead of silently showing an un-highlighted transcript.
+      txNotFound = idx<0;
       txParts = idx>=0
         ? [{text:full.slice(0,idx),style:''},{text:full.slice(idx,idx+qlen),style:hl},{text:full.slice(idx+qlen),style:''}]
         : [{text:full,style:''}];
@@ -945,8 +971,7 @@ class Component extends DCLogic {
       const cwRaw = st.openTxCw||'';
       if(cwRaw){ txHasCw=true;
         const cwNeedle=st.openTxOrig||txQuote;
-        let ci=cwNeedle?cwRaw.indexOf(cwNeedle):-1, clen=cwNeedle.length;
-        if(ci<0&&cwNeedle){ const p=cwNeedle.slice(0,40); if(p){ci=cwRaw.indexOf(p);clen=Math.min(cwNeedle.length,40);} }
+        const [ci, clen] = tx_findSpan(cwRaw, cwNeedle);
         txCwParts = ci>=0
           ? [{text:cwRaw.slice(0,ci),style:''},{text:cwRaw.slice(ci,ci+clen),style:hl},{text:cwRaw.slice(ci+clen),style:''}]
           : [{text:cwRaw,style:''}];
@@ -971,7 +996,7 @@ class Component extends DCLogic {
       selName, selKicker, selColor, detRows, detClass, detBench, detImpls, detImplsPanel, detQuotes, detQuoteGroups, implFilterChip, quoteCount, moreQuotes, stageChips,
       lineageShow, lineageOptions, lineageChips, onLineageChange, headerKicker, headerTitle,
       stageToggles, anyStageHidden, showAllStages:this.showAllStages,
-      txOpen, txModel, txFamily, txEval, txSid, txQuote, txOrig, txHasOrig, txParts, txHasCw, txCwParts, txPrompt, txHasPrompt, closeTx:this.closeTx,
+      txOpen, txModel, txFamily, txEval, txSid, txQuote, txOrig, txHasOrig, txParts, txHasCw, txCwParts, txPrompt, txHasPrompt, txNotFound, closeTx:this.closeTx,
       tipShow, tipX, tipY, tipTransform, tipColor, tipLabel, tipLine1, tipLine2,
       onFlowMove:this.onFlowMove, onFlowLeave:this.onFlowLeave
     };

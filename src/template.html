@@ -481,6 +481,9 @@ html,body{margin:0;height:100%;background:#F6F5F2}
           <div style="font-family:'Spline Sans Mono',monospace;font-size:11.5px;line-height:1.65;color:#33332E;white-space:pre-wrap;word-break:break-word;background:#F1F4F8;border-left:3px solid #7C93B0;padding:10px 12px;border-radius:4px;margin-bottom:18px">{{ txPrompt }}</div>
         </sc-if>
         <div style="font-family:'Spline Sans Mono',monospace;font-size:8.5px;letter-spacing:.15em;text-transform:uppercase;color:#93918B;margin-bottom:9px">Model response &mdash; the highlighted span is the quote in context</div>
+        <sc-if value="{{ txNotFound }}" hint-placeholder-val="{{ false }}">
+          <div style="font-family:'Spline Sans Mono',monospace;font-size:10.5px;line-height:1.5;color:#8A5A00;background:#FBF3C9;border-left:3px solid #D4A017;padding:8px 11px;border-radius:4px;margin-bottom:12px">Couldn&rsquo;t auto-locate this exact quote in the transcript below &mdash; it was lightly paraphrased when extracted, or falls past the display length limit. The response text is shown unhighlighted.</div>
+        </sc-if>
         <div style="font-family:'Spline Sans Mono',monospace;font-size:11.5px;line-height:1.65;color:#33332E;white-space:pre-wrap;word-break:break-word"><sc-for list="{{ txParts }}" as="p" hint-placeholder-count="3"><span style="{{ p.style }}">{{ p.text }}</span></sc-for></div>
       </div>
     </div>

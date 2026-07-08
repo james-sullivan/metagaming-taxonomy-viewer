@@ -69,7 +69,7 @@ function cp_wrap(text,maxChars,maxLines){
   kept[maxLines-1]=last+'…';return kept;}
 
 class Component extends DCLogic {
-  state = { dataset:null, measure:null, modelGroup:'all', hiddenFams:{}, hiddenStages:{}, selFam:null, qStage:'all', implFilter:null, scope:'all', accThr:70, openTx:null, openTxQuote:'', openTxOrig:'', openTxFam:'', openTxCw:'', hover:null, hx:0, hy:0, hw:0, hh:0 };
+  state = { dataset:null, measure:null, modelGroup:'all', hiddenFams:{}, hiddenStages:{}, selFam:null, qStage:'all', implFilter:null, scope:'all', accThr:70, veaOnly:false, openTx:null, openTxQuote:'', openTxOrig:'', openTxFam:'', openTxCw:'', hover:null, hx:0, hy:0, hw:0, hh:0 };
 
   componentDidMount(){ this._tick(0); }
   _tick(n){ if(window.TAXO){ this.forceUpdate(); } else if(n<80){ setTimeout(()=>this._tick(n+1),40); } }
@@ -80,7 +80,7 @@ class Component extends DCLogic {
   setTxRate=()=>this.setState({measure:'txrate'});
   setModelGroup=(g)=>this.setState({modelGroup:g});
   // switching lineage MUST reset all per-lineage UI state or the view mis-renders
-  setDataset=(id)=>this.setState({dataset:id, selFam:null, hiddenFams:{}, hiddenStages:{}, scope:'all', qStage:'all', implFilter:null, modelGroup:'all', openTx:null, openTxQuote:'', openTxOrig:'', openTxFam:'', openTxCw:'', hover:null});
+  setDataset=(id)=>this.setState({dataset:id, selFam:null, hiddenFams:{}, hiddenStages:{}, scope:'all', qStage:'all', implFilter:null, modelGroup:'all', veaOnly:false, openTx:null, openTxQuote:'', openTxOrig:'', openTxFam:'', openTxCw:'', hover:null});
   toggleFam=(k)=>this.setState(s=>{ const h=Object.assign({},s.hiddenFams); if(h[k]) delete h[k]; else h[k]=true; return {hiddenFams:h}; });
   showAllFams=()=>this.setState({hiddenFams:{}});
   toggleStage=(i)=>this.setState(s=>{ const h=Object.assign({},s.hiddenStages); if(h[i]) delete h[i]; else h[i]=true; return {hiddenStages:h}; });
@@ -92,6 +92,8 @@ class Component extends DCLogic {
   setScope=(v)=>this.setState(s=>({scope:s.scope===v?'all':v}));
   allBench=()=>this.setState({scope:'all'});
   setAccThr=(t)=>this.setState({accThr:t});
+  setVeaAll=()=>this.setState({veaOnly:false});
+  setVeaOnly=()=>this.setState({veaOnly:true});
   setCompView=(v)=>this.setState({compView:v});
   showTx=(tk,qt,oq,fam,cw)=>this.setState({openTx:tk, openTxQuote:qt||'', openTxOrig:oq||qt||'', openTxFam:fam||'', openTxCw:cw||''});
   closeTx=()=>this.setState({openTx:null, openTxQuote:'', openTxOrig:'', openTxFam:'', openTxCw:''});
@@ -124,12 +126,22 @@ class Component extends DCLogic {
     if(s.startsWith('eval:')) return [s.slice(5)];
     return null;
   }
-  effCounts(fam, evals){ // -> [n_stages]
+  effCounts(fam, evals){ // -> [n_stages]; VEA-only mode sources veaCount/veaByEval instead
+    const veaOnly=!!this.state.veaOnly;
     const NS=(fam.counts||[]).length;
-    if(!evals) return fam.counts;
+    if(!evals) return veaOnly ? (fam.veaCount||new Array(NS).fill(0)) : fam.counts;
+    const src = veaOnly ? (fam.veaByEval||{}) : fam.byEval;
     const out=new Array(NS).fill(0);
-    evals.forEach(e=>{ const a=fam.byEval[e]; if(a) for(let i=0;i<NS;i++) out[i]+=(a[i]||0); });
+    evals.forEach(e=>{ const a=src[e]; if(a) for(let i=0;i<NS;i++) out[i]+=(a[i]||0); });
     return out;
+  }
+  // VEA-only mirror of a per-implication counts/byEval lookup, used by both composition
+  // views (subValAt) and the detail-panel implication trajectories (_svAt).
+  implValAt(im, c, evals){
+    const veaOnly=!!this.state.veaOnly;
+    const counts = veaOnly ? im.veaCounts : im.counts;
+    const byEval = veaOnly ? im.veaByEval : im.byEval;
+    return (evals && byEval) ? evals.reduce((a,e)=>a+(((byEval[e])||[])[c]||0),0) : ((counts||[])[c]||0);
   }
 
   renderVals(){
@@ -139,11 +151,16 @@ class Component extends DCLogic {
     const dsId=isMulti ? ((this.state.dataset && TX.datasets[this.state.dataset]) ? this.state.dataset : TX.default) : null;
     const T=isMulti ? TX.datasets[dsId] : TX;
     const LMETA=isMulti ? (TX.lineages[dsId]||{}) : {};
-    if(!T) return { ready:false, hasSel:false, legend:[], benchGroups:[], flowChart:null, flowTitle:'Composition by stage', compViewChips:[], statQuotes:'', statResponses:'', statBenchmarks:'', detRows:[], detBench:[], detQuotes:[], detImpls:[], detImplsPanel:null, stageChips:[], stageToggles:[], lineageOptions:[], lineageChips:[], lineageShow:false, headerKicker:'Metagaming taxonomy', headerTitle:'How does the taxonomy of metagaming verbalizations change across post-training?', tipShow:false, flowMin:440, benchDescShow:false, benchDescTag:'', benchDescText:'', benchDescUrl:'', detQuoteGroups:[], implFilterChip:null, detClass:[], veaSplit:[], accBands:[], accThrChips:[], accReady:false, eaSub:'', veaColLbl:'', mgColLbl:'', veaSwatch:'#7A3E9A', mgSwatch:'#2C6E63', modelGroupChips:[], showAllFams:this.showAllFams, anyHidden:false, anyStageHidden:false, showAllStages:this.showAllStages, txOpen:false, txModel:'', txFamily:'', txEval:'', txSid:'', txQuote:'', txOrig:'', txHasOrig:false, txParts:[], txPrompt:'', txHasPrompt:false, closeTx:this.closeTx, onFlowMove:this.onFlowMove, onFlowLeave:this.onFlowLeave };
+    if(!T) return { ready:false, hasSel:false, legend:[], benchGroups:[], flowChart:null, flowTitle:'Composition by stage', compViewChips:[], statQuotes:'', statResponses:'', statBenchmarks:'', detRows:[], detBench:[], detQuotes:[], detImpls:[], detImplsPanel:null, stageChips:[], stageToggles:[], lineageOptions:[], lineageChips:[], lineageShow:false, headerKicker:'Metagaming taxonomy', headerTitle:'How does the taxonomy of metagaming verbalizations change across post-training?', tipShow:false, flowMin:440, benchDescShow:false, benchDescTag:'', benchDescText:'', benchDescUrl:'', detQuoteGroups:[], implFilterChip:null, detClass:[], veaSplit:[], accBands:[], accThrChips:[], accReady:false, eaSub:'', veaColLbl:'', mgColLbl:'', veaSwatch:'#7A3E9A', mgSwatch:'#2C6E63', modelGroupChips:[], showAllFams:this.showAllFams, anyHidden:false, anyStageHidden:false, showAllStages:this.showAllStages, veaAvailable:false, veaAllBtnStyle:'', veaOnlyBtnStyle:'', veaScopeHint:'', setVeaAll:this.setVeaAll, setVeaOnly:this.setVeaOnly, txOpen:false, txModel:'', txFamily:'', txEval:'', txSid:'', txQuote:'', txOrig:'', txHasOrig:false, txParts:[], txPrompt:'', txHasPrompt:false, closeTx:this.closeTx, onFlowMove:this.onFlowMove, onFlowLeave:this.onFlowLeave };
     const st=this.state, P=this.props||{};
     const measure = st.measure || P.defaultMeasure || 'rate';
     const share = measure==='share';
     const CAT=this.CAT;
+    // ----- "VEA only" whole-view toggle: restricts every count/rate/quote/transcript below
+    // to eval_aware-labeled data (veaCount/veaByEval/veaTxByEval mirrors of the ALL-quote
+    // fields). Only offered when this lineage actually has VEA-labeled quotes.
+    const veaOnly = !!st.veaOnly;
+    const veaAvailable = (T.families||[]).some(f=>(f.veaLabeled||[]).some(v=>v>0));
     // ----- data-driven stages (any number of model columns; lineage vs reference) -----
     const STAGES=T.stages||[];
     const NS=STAGES.length;
@@ -179,7 +196,7 @@ class Component extends DCLogic {
     const EFF={}; T.families.forEach(f=>EFF[f.key]=this.effCounts(f,evals));
     const lintot=(f)=> lin.reduce((s,c)=>s+(EFF[f.key][c]||0),0);
     // STABLE order from full counts (so bands keep position across scopes)
-    const fullTot=(f)=> (lin.length?lin:ALLC).reduce((s,c)=>s+(f.counts[c]||0),0);
+    const fullTot=(f)=> (lin.length?lin:ALLC).reduce((s,c)=>s+((veaOnly?f.veaCount:f.counts)[c]||0),0);
     let legendOrder=T.families.slice().sort((a,b)=> ((a.key==='noise')-(b.key==='noise')) || (fullTot(b)-fullTot(a)));
     if(hideNoise) legendOrder=legendOrder.filter(f=>f.key!=='noise');
     // visible families (per-family checkboxes) drive the flow chart + every aggregate
@@ -190,13 +207,18 @@ class Component extends DCLogic {
     const rateMode = measure==='rate';
     const txRateMode = measure==='txrate';
     const hasData=(c)=>{const act=evals||T.evals.map(e=>e.key);return act.some(e=>(T.sampleTotals[e]||[])[c]>0);};
+    // VEA coverage check: does this stage/scope have any VEA-labeled quote at all? Used
+    // (only under veaOnly) to distinguish a true zero from a stage the VEA judge never covered.
+    const veaHasData=(c)=>{const act=evals||T.evals.map(e=>e.key);return (T.families||[]).some(f=>act.some(e=>((f.veaLabByEval&&f.veaLabByEval[e])||[])[c]>0));};
+    const hasDataEff=(c)=> veaOnly ? (hasData(c)&&veaHasData(c)) : hasData(c);
     // equal-weighted rate per family per stage (each benchmark weighted evenly)
     const EWRATE={};
     T.families.forEach(f=>{EWRATE[f.key]=ALLC.map(c=>{
       const act=evals||T.evals.map(e=>e.key);
       const val=act.filter(e=>(T.sampleTotals[e]||[])[c]>0);
       if(!val.length)return 0;
-      return val.reduce((s,e)=>s+((f.byEval[e]||[])[c]||0)/T.sampleTotals[e][c],0)/val.length;
+      const src = veaOnly ? (f.veaByEval||{}) : f.byEval;
+      return val.reduce((s,e)=>s+((src[e]||[])[c]||0)/T.sampleTotals[e][c],0)/val.length;
     });});
     const EWRTOT=ALLC.map(c=>order.reduce((s,f)=>s+EWRATE[f.key][c],0));
     // equal-weighted per-family TRANSCRIPT rate: fraction of transcripts with >=1 quote
@@ -207,14 +229,16 @@ class Component extends DCLogic {
       const act=evals||T.evals.map(e=>e.key);
       const val=act.filter(e=>(T.sampleTotals[e]||[])[c]>0);
       if(!val.length)return 0;
-      return val.reduce((s,e)=>s+(((f.txByEval&&f.txByEval[e])||[])[c]||0)/T.sampleTotals[e][c],0)/val.length;
+      const src = veaOnly ? (f.veaTxByEval||{}) : f.txByEval;
+      return val.reduce((s,e)=>s+(((src&&src[e])||[])[c]||0)/T.sampleTotals[e][c],0)/val.length;
     });});
-    // transcript metagaming rate per stage (equal-weighted)
-    const TXMGR=T.transcriptMgCounts?ALLC.map(c=>{
+    // transcript metagaming (or, under veaOnly, eval-aware) rate per stage (equal-weighted)
+    const TXSRC = veaOnly ? T.transcriptVeaCounts : T.transcriptMgCounts;
+    const TXMGR=TXSRC?ALLC.map(c=>{
       const act=evals||T.evals.map(e=>e.key);
       const val=act.filter(e=>(T.sampleTotals[e]||[])[c]>0);
       if(!val.length)return 0;
-      return val.reduce((s,e)=>s+((T.transcriptMgCounts[e]||[])[c]||0)/T.sampleTotals[e][c],0)/val.length;
+      return val.reduce((s,e)=>s+((TXSRC[e]||[])[c]||0)/T.sampleTotals[e][c],0)/val.length;
     }):null;
     const fmtRate=(v)=> v<=0?'0': v<0.1? (+v.toFixed(3)).toString() : v.toFixed(2);
 
@@ -260,6 +284,9 @@ class Component extends DCLogic {
     let scopeReadout='all 10 benchmarks', scopeShort='all benchmarks';
     if(st.scope.startsWith('cat:')){ const c=st.scope.slice(4); scopeReadout=(T.catLabel[c]||c)+' benchmarks'; scopeShort=(T.catLabel[c]||c); }
     else if(st.scope.startsWith('eval:')){ const e=T.evals.find(x=>x.key===st.scope.slice(5)); scopeReadout=e?e.label:''; scopeShort=e?e.label:''; }
+    // surface the "VEA only" whole-view filter everywhere scopeShort/scopeReadout are shown
+    // (flow chart caption, eval-awareness panel, family detail kicker, etc.)
+    if(veaOnly){ scopeReadout+=' · VEA only'; scopeShort+=' · VEA only'; }
     const allBenchLabel = filtering ? '✕  Clear filter' : ('All benchmarks · '+totalAll);
     const benchNote = filtering ? ('— showing: '+scopeShort) : '— filter the view by class or a single benchmark';
 
@@ -317,11 +344,11 @@ class Component extends DCLogic {
     }});
     // stable axis max for transcript MG rate across all scopes
     let GRATE_TX=1e-9;
-    if(T.transcriptMgCounts){_SCOPES.forEach(ev=>{for(let c=0;c<NS;c++){
+    if(TXSRC){_SCOPES.forEach(ev=>{for(let c=0;c<NS;c++){
       const act=ev||T.evals.map(e=>e.key);
       const val=act.filter(e=>(T.sampleTotals[e]||[])[c]>0);
       if(!val.length)continue;
-      const rt=val.reduce((s,e)=>s+((T.transcriptMgCounts[e]||[])[c]||0)/T.sampleTotals[e][c],0)/val.length;
+      const rt=val.reduce((s,e)=>s+((TXSRC[e]||[])[c]||0)/T.sampleTotals[e][c],0)/val.length;
       GRATE_TX=Math.max(GRATE_TX,rt);
     }});}
     // axis max for the PER-FAMILY transcript rate (Tx% view). Scale to the CURRENT scope's
@@ -351,7 +378,7 @@ class Component extends DCLogic {
       const GW=Math.min(2*gHalf2, 46*nf+16, 0.82*gspace);
       const innerGap=Math.max(2, Math.min(10, 90/nf));
       const bw2=Math.max(6,(GW-innerGap*(nf-1))/nf);
-      cols.forEach(c=>{ if(!hasData(c))return; order.forEach((f,fi)=>{
+      cols.forEach(c=>{ if(!hasDataEff(c))return; order.forEach((f,fi)=>{
         const rt=EWTXRATE[f.key][c], hgt=(rt/AXR_TXFAM)*ph;
         const x=CX(c)-GW/2+fi*(bw2+innerGap);
         const dim=st.selFam&&st.selFam!==f.key, hov=st.hover&&st.hover.f===f.key&&st.hover.c===c;
@@ -375,7 +402,7 @@ class Component extends DCLogic {
       fk.push(h('text',{key:'qt',x:refMid,y:top+12,textAnchor:'middle',style:{font:'11px "Spline Sans Mono",monospace',fill:'#B7B5AE',letterSpacing:'.12em'}},'OFF-LINEAGE')); }
     cols.forEach(c=>{ const isRef=STAGES[c].is_reference;
       fk.push(h('text',{key:'xl'+c,x:CX(c),y:baseY+27,textAnchor:'middle',style:{font:(isRef?'600 13px':'600 17px')+' "Spline Sans",sans-serif',fill: isRef?'#8A8780':'#1D1D1B'}}, COLLBL[c]));
-      const sub = rateMode?(hasData(c)?fmtRate(EWRTOT[c])+' /tx':'no data'): txRateMode?(TXMGR&&hasData(c)?fmtPct(TXMGR[c])+' any mg':'no data'): ('n='+TOT[c]);
+      const sub = rateMode?(hasDataEff(c)?fmtRate(EWRTOT[c])+' /tx':'no data'): txRateMode?(TXMGR&&hasDataEff(c)?fmtPct(TXMGR[c])+(veaOnly?' any VEA':' any mg'):'no data'): ('n='+TOT[c]);
       fk.push(h('text',{key:'xn'+c,x:CX(c),y:baseY+43,textAnchor:'middle',style:{font:(rateMode?'600 12.5px':'12px')+' "Spline Sans Mono",monospace',fill: (rateMode||txRateMode)?'#46453F':'#A6A49D'}}, sub));
       if(rateMode||txRateMode) fk.push(h('text',{key:'xs'+c,x:CX(c),y:baseY+55,textAnchor:'middle',style:{font:'10px "Spline Sans Mono",monospace',fill:'#B7B5AE'}}, SAMP[c]?(rateMode?(TOT[c]+' / '+SAMP[c]):('n='+SAMP[c]+' tx')):'')); });
     // ---------- x axis caption: Olmo 3 post-training lineage ----------
@@ -407,10 +434,10 @@ class Component extends DCLogic {
     // stacked bar per stage; each TYPE is a segment, subdivided into its SUBTYPE slices.
     {
       const compView = st.compView || 'bars';
-      // scope-aware subtype value at stage si (per-eval counts when a benchmark is filtered)
-      const subValAt=(im,si)=> (evals && im.byEval)
-        ? evals.reduce((a,e)=>a+(((im.byEval[e])||[])[si]||0),0)
-        : ((im.counts||[])[si]||0);
+      // scope-aware subtype value at stage si (per-eval counts when a benchmark is filtered;
+      // veaOnly-aware via implValAt, so the total (EFF) and named-subtype counts stay on the
+      // same basis and the "other/unclustered" remainder doesn't go negative)
+      const subValAt=(im,si)=> this.implValAt(im,si,evals);
       // per (type, stage): named subtype entries + a muted "unclustered" remainder, scope-aware
       const subList=(f,si)=>{
         const named=(f.implications||[]).map(im=>({ text:im.text, val:subValAt(im,si) }))
@@ -543,14 +570,14 @@ class Component extends DCLogic {
         const GW=Math.min(2*gHalf, 46*nf+16, 0.82*gspace);
         const innerGap=Math.max(2, Math.min(10, 90/nf));
         const bw2=Math.max(6,(GW-innerGap*(nf-1))/nf);
-        if(cols.some(c=>hasData(c))){
+        if(cols.some(c=>hasDataEff(c))){
           const els=[];
           [0,0.25,0.5,0.75,1].forEach((t,i)=>{ const y=baseY2 - t*ph2;
             els.push(h('line',{key:'yg'+i,x1:axX,x2:plotR,y1:y.toFixed(1),y2:y.toFixed(1),stroke:'#ECEAE4',strokeWidth:1,strokeDasharray:i?'2 5':'none'}));
             els.push(h('text',{key:'yl'+i,x:(axX-8).toFixed(1),y:(y+3).toFixed(1),textAnchor:'end',style:{font:'10px "Spline Sans Mono",monospace',fill:'#A6A49D'}}, Math.round(t*100)+'%')); });
           els.push(h('text',{key:'yt',transform:'translate(16,'+(top+ph2/2)+') rotate(-90)',textAnchor:'middle',style:{font:'9.5px "Spline Sans Mono",monospace',fill:'#B7B5AE',letterSpacing:'.1em'}}, '% TRANSCRIPTS W/ FAMILY QUOTE'));
           cols.forEach((c,k)=>{
-            const cx=cxOf(k), stageLabel=COLLBL[c], dataHere=hasData(c);
+            const cx=cxOf(k), stageLabel=COLLBL[c], dataHere=hasDataEff(c);
             if(dataHere){ order.forEach((f,fi)=>{
               const rt=EWTXRATE[f.key][c], hgt=(rt/AXR_TXFAM)*ph2;
               const x=cx-GW/2+fi*(bw2+innerGap), dim=st.selFam&&st.selFam!==f.key;
@@ -655,9 +682,9 @@ class Component extends DCLogic {
       if(st.hover.ribbon){ tipLine1='carries across the lineage'; tipLine2=scopeShort; }
       else { const c=st.hover.c; tipLine1=COLLBL[c]+(STAGES[c].is_reference?' · reference':' · stage');
         tipLine2 = rateMode
-          ? (hasData(c)? (fmtRate(EWRATE[f.key][c])+' /tx  ·  n='+EFF[f.key][c]) : 'no responses')
+          ? (hasDataEff(c)? (fmtRate(EWRATE[f.key][c])+' /tx  ·  n='+EFF[f.key][c]) : 'no responses')
           : txRateMode
-          ? (hasData(c)? fmtPct(EWTXRATE[f.key][c])+' of transcripts have a '+f.label.toLowerCase()+' quote' : 'no data')
+          ? (hasDataEff(c)? fmtPct(EWTXRATE[f.key][c])+' of transcripts have a '+f.label.toLowerCase()+' quote' : 'no data')
           : ('n='+EFF[f.key][c]+'   ·   '+fmtPct(EFF[f.key][c]/(TOT[c]||1))+' of stage'); }
       }
     }
@@ -669,21 +696,23 @@ class Component extends DCLogic {
       selColor=col(selFamObj.key);
       selName=selFamObj.label;
       const ec=EFF[selFamObj.key], sTot=lin.reduce((s,c)=>s+(ec[c]||0),0);
-      // VEA share of this family (eval_aware quotes / VEA-labeled quotes across lineage)
+      // VEA share of this family (eval_aware quotes / VEA-labeled quotes across lineage). Omitted
+      // under veaOnly since sTot is already VEA-restricted (the ratio would be a tautological 100%).
       const _vL=(selFamObj.veaLabeled||[]).reduce((a,b)=>a+b,0), _vE=(selFamObj.veaCount||[]).reduce((a,b)=>a+b,0);
-      selKicker=sTot+' quotes across lineage · '+scopeShort+(_vL?' · '+Math.round(_vE/_vL*100)+'% VEA (of '+_vL+' labeled)':'');
+      selKicker=sTot+' quotes across lineage · '+scopeShort+((_vL&&!veaOnly)?' · '+Math.round(_vE/_vL*100)+'% VEA (of '+_vL+' labeled)':'');
       const famMaxRate=Math.max(...cols.map(c=>EWRATE[selFamObj.key][c]),1e-9);
       const famMaxTxRate=Math.max(...cols.map(c=>EWTXRATE[selFamObj.key][c]),1e-9);
       detRows=cols.map(c=>{ const cnt=ec[c], shr=cnt/(TOT[c]||1), rr=EWRATE[selFamObj.key][c], tr=EWTXRATE[selFamObj.key][c];
-        const big = share?fmtPct(shr): rateMode?(hasData(c)?fmtRate(rr)+' /tx':'—'): txRateMode?(hasData(c)?fmtPct(tr):'—') : String(cnt);
+        const big = share?fmtPct(shr): rateMode?(hasDataEff(c)?fmtRate(rr)+' /tx':'—'): txRateMode?(hasDataEff(c)?fmtPct(tr):'—') : String(cnt);
         const small = rateMode?('n='+cnt) : txRateMode?('n='+cnt) : share?('n='+cnt):fmtPct(shr);
         const bw = share?Math.min(1,shr) : rateMode?(rr/famMaxRate) : txRateMode?(tr/famMaxTxRate) : Math.min(1,shr);
         return { label:COLLBL[c], big, small, barW:(bw*100).toFixed(1)+'%', lblColor:STAGES[c].is_reference?'#A6A49D':'#46453F', barDash:STAGES[c].is_reference?'background-image:repeating-linear-gradient(90deg,'+selColor+' 0 5px,transparent 5px 8px);':'' }; });
       // eval-class makeup of this family per checkpoint (capability / safety / natural)
       const _evCat={}; T.evals.forEach(e=>_evCat[e.key]=e.cat);
       const _esD = evals || T.evals.map(e=>e.key);
+      const _classSrc = veaOnly ? (selFamObj.veaByEval||{}) : selFamObj.byEval;
       detClass=cols.map(c=>{ const by={capability:0,safety:0,natural:0};
-        _esD.forEach(k=>{ const a=selFamObj.byEval[k]; if(a) by[_evCat[k]] += (a[c]||0); });
+        _esD.forEach(k=>{ const a=_classSrc[k]; if(a) by[_evCat[k]] += (a[c]||0); });
         const tt=by.capability+by.safety+by.natural;
         return { label:COLLBL[c], total:tt, lblColor:STAGES[c].is_reference?'#A6A49D':'#46453F',
           segs:T.catOrder.filter(cl=>by[cl]>0).map(cl=>({ w:(by[cl]/tt*100).toFixed(2)+'%', color:this.CAT[cl], lbl:(T.catLabel[cl]||cl)+': '+by[cl] })) }; });
@@ -695,7 +724,7 @@ class Component extends DCLogic {
       // per cluster); the trend arrow + total count keep the trajectory legible even when a
       // small cluster's line is nearly flat. Native <title> gives exact per-stage values.
       // scope-aware: per-eval counts when a benchmark filter is active, else pooled per-stage.
-      const _svAt=(im,c)=> (evals && im.byEval) ? evals.reduce((a,e)=>a+(((im.byEval[e])||[])[c]||0),0) : ((im.counts||[])[c]||0);
+      const _svAt=(im,c)=> this.implValAt(im,c,evals);
       const _denAt=(c)=> evals ? evals.reduce((a,e)=>a+((T.sampleTotals[e]||[])[c]||0),0) : ((T.stageSamples||[])[c]||0);
       // strip the leading entity name so these titles read like the bubble labels (which drop
       // the first word when it repeats the type/entity name); e.g. "Source Expected Answer" -> "Expected Answer".
@@ -746,14 +775,16 @@ class Component extends DCLogic {
         ]);
       }
       // benchmark mix for this family (lineage counts), all benchmarks regardless of scope
-      const mix=T.evals.map(e=>{ const a=selFamObj.byEval[e.key]; const n=a?lin.reduce((s,c)=>s+(a[c]||0),0):0; return {e, n}; }).filter(x=>x.n>0).sort((a,b)=>b.n-a.n);
+      const mix=T.evals.map(e=>{ const a=_classSrc[e.key]; const n=a?lin.reduce((s,c)=>s+(a[c]||0),0):0; return {e, n}; }).filter(x=>x.n>0).sort((a,b)=>b.n-a.n);
       const mixMax=Math.max(...mix.map(x=>x.n),1);
       detBench=mix.map(({e,n})=>{ const active=st.scope==='eval:'+e.key; return { label:e.label, count:n, color:selColor, barW:Math.max(4,(n/mixMax)*90).toFixed(0)+'px',
         onClick:()=>this.setScope('eval:'+e.key),
         rowStyle:'display:flex;align-items:center;gap:8px;padding:3px 6px;border-radius:6px;cursor:pointer;'+(active?'background:#EFEDE7;':'') }; });
       // quotes filtered by scope (eval) + stage + implication cluster (click a cluster row above)
+      // + veaOnly (exact per-quote filter, since q.vea is set on the individual quote object)
       const inScope=(q)=> !evals || q.ev.some(e=>evals.includes(e));
       let src=(selFamObj.quotes||[]).filter(inScope);
+      if(veaOnly) src=src.filter(q=>q.vea==='eval_aware');
       if(st.implFilter) src=src.filter(q=>q.impl===st.implFilter);
       const filt = st.qStage==='all' ? src : src.filter(q=>q.cols.includes(st.qStage));
       const badgeStyle=(c)=> STAGES[c].is_reference
@@ -801,6 +832,12 @@ class Component extends DCLogic {
       : txRateMode?'One bar per family = fraction of transcripts with ≥1 quote in that family (equal-weighted across benchmarks). Independent per family, so bars do not sum.'
       : 'Raw quote counts. Confounded — sampling differs by benchmark and stage.';
 
+    // ---------- "VEA only" whole-view toggle ----------
+    const veaAllBtnStyle = !veaOnly?onStyle:offStyle, veaOnlyBtnStyle = veaOnly?onStyle:offStyle;
+    const veaScopeHint = veaOnly
+      ? 'Every count, rate, chart, quote, and transcript above is restricted to eval-aware (VEA) verbalizations. VEA coverage is partial across models/benchmarks — "no data" (above) means unjudged, not necessarily zero.'
+      : 'VEA = the model verbalizes awareness it may be evaluated/graded, a subset of metagaming. Switch to restrict the whole view to VEA-positive quotes and transcripts only.';
+
     // ---------- benchmark description (shown when a single benchmark is selected) ----------
     let benchDescShow=false, benchDescTag='', benchDescText='', benchDescUrl='';
     if(st.scope.startsWith('eval:')){ const d=this.BENCHDESC[st.scope.slice(5)]; if(d){ benchDescShow=true; benchDescTag=d.tag; benchDescText=d.desc; benchDescUrl=d.src; } }
@@ -845,7 +882,9 @@ class Component extends DCLogic {
         veaN += ((f.veaByEval&&f.veaByEval[e])||[])[c]||0;
         labN += ((f.veaLabByEval&&f.veaLabByEval[e])||[])[c]||0;
       }); });
-      const mgN  = Math.max(0, labN - veaN), tot = veaN + mgN;
+      // under veaOnly the whole view is already restricted to eval-aware quotes, so the
+      // "metagaming-only" bucket is zeroed rather than shown as a residual non-VEA slice.
+      const mgN  = veaOnly ? 0 : Math.max(0, labN - veaN), tot = veaN + mgN;
       const veaPct = tot? veaN/tot : 0, mgPct = tot? mgN/tot : 0;
       return { label:COLLBL[c], lblColor:STAGES[c].is_reference?'#A6A49D':'#46453F', veaN, mgN, tot,
                veaW:(veaPct*100).toFixed(2)+'%', mgW:(mgPct*100).toFixed(2)+'%',
@@ -921,6 +960,7 @@ class Component extends DCLogic {
       measureHint,
       benchDescShow, benchDescTag, benchDescText, benchDescUrl,
       modelGroupChips, showAllFams:this.showAllFams, anyHidden,
+      veaAvailable, veaAllBtnStyle, veaOnlyBtnStyle, veaScopeHint, setVeaAll:this.setVeaAll, setVeaOnly:this.setVeaOnly,
       veaSplit, veaColLbl:'eval-aware (VEA)', mgColLbl:'metagaming-only', veaSwatch:VEA_COL, mgSwatch:MG_COL,
       accReady, accBands, accThrChips, accThr, eaSub,
       shareBtnStyle: share?onStyle:offStyle, rateBtnStyle: rateMode?onStyle:offStyle, txRateBtnStyle: txRateMode?onStyle:offStyle, countBtnStyle: (!share&&!rateMode&&!txRateMode)?onStyle:offStyle,

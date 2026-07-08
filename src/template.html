@@ -175,6 +175,15 @@ html,body{margin:0;height:100%;background:#F6F5F2}
       </div>
       <div style="font-family:'Spline Sans Mono',monospace;font-size:9.5px;line-height:1.5;color:#A6A49D;margin-bottom:20px">{{ measureHint }}</div>
 
+      <sc-if value="{{ veaAvailable }}" hint-placeholder-val="{{ false }}">
+        <div style="font-family:'Spline Sans Mono',monospace;font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;color:#93918B;margin-bottom:9px">Verbalization scope</div>
+        <div style="display:flex;gap:0;border:1px solid #DCD9D2;border-radius:6px;overflow:hidden;margin-bottom:5px">
+          <button onclick="{{ setVeaAll }}" style="{{ veaAllBtnStyle }}">All quotes</button>
+          <button onclick="{{ setVeaOnly }}" style="{{ veaOnlyBtnStyle }}">VEA only</button>
+        </div>
+        <div style="font-family:'Spline Sans Mono',monospace;font-size:9.5px;line-height:1.5;color:#A6A49D;margin-bottom:20px">{{ veaScopeHint }}</div>
+      </sc-if>
+
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px">
         <span style="font-family:'Spline Sans Mono',monospace;font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;color:#93918B">Stages</span>
         <sc-if value="{{ anyStageHidden }}" hint-placeholder-val="{{ false }}"><button onclick="{{ showAllStages }}" style="font-family:'Spline Sans Mono',monospace;font-size:9.5px;color:#2C6E63;background:none;border:none;cursor:pointer;padding:0">show all</button></sc-if>

@@ -64,7 +64,9 @@ TAXO data is generated in a SEPARATE repo (the research repo), by `experiments/m
 
 Current dev dataset path: `/workspace/experiments/metagaming_taxonomy/output/taxo_decomposed/taxo.js` (a `window.TAXO = {...}` file). `public/taxo.js` is gitignored and regenerated as needed.
 
-As of this writing: production `index.html` embeds 6 lineages; `dev/index.html` embeds 7 (adds `nemotron`). Both are schema 2.
+As of this writing: both `index.html` and `dev/index.html` embed the same schema-2 bundle with 7 lineages.
+
+The lineage shown on first load is NOT set in the UI code. `src/component.js` falls back to `TAXO.default`, which the exporter copies from `"default"` in the research repo's `experiments/metagaming_taxonomy/lineages.json`. To change the default lineage, edit that registry key (currently `olmo3`) and rebuild both bundles.
 
 To add a new data field for the UI:
 1. Edit `export_decomposed_viewer.py` in the research repo.

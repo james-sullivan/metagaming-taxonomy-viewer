@@ -206,10 +206,10 @@ html,body{margin:0;height:100%;background:#F6F5F2}
       </div>
       <div style="display:flex;flex-direction:column;gap:2px">
         <sc-for list="{{ legend }}" as="f" hint-placeholder-count="8">
-          <div class="lg-row" style="{{ f.rowStyle }}">
+          <div class="lg-row" onclick="{{ f.onClick }}" style="{{ f.rowStyle }}">
             <div style="display:flex;align-items:center;gap:9px">
-              <input type="checkbox" checked="{{ f.checked }}" onchange="{{ f.onToggle }}" title="include this family in the view" style="flex:none;accent-color:{{ f.color }};width:13px;height:13px;cursor:pointer">
-              <span onclick="{{ f.onClick }}" style="flex:1;min-width:0;display:flex;align-items:center;gap:8px;cursor:pointer">
+              <input type="checkbox" checked="{{ f.checked }}" onchange="{{ f.onToggle }}" onclick="{{ f.stopProp }}" title="include this family in the view" style="flex:none;accent-color:{{ f.color }};width:13px;height:13px;cursor:pointer">
+              <span style="flex:1;min-width:0;display:flex;align-items:center;gap:8px;cursor:pointer">
                 <span style="flex:none;width:11px;height:11px;border-radius:3px;background:{{ f.color }}"></span>
                 <span style="flex:1;min-width:0;font-size:13px;font-weight:600;line-height:1.25;color:#23231F;text-wrap:pretty">{{ f.label }}</span>
               </span>
@@ -223,7 +223,7 @@ html,body{margin:0;height:100%;background:#F6F5F2}
           </div>
         </sc-for>
       </div>
-      <div style="font-family:'Spline Sans Mono',monospace;font-size:9px;line-height:1.5;color:#B7B5AE;margin-top:14px">Stage checkboxes include/exclude each checkpoint column across the whole view. Family checkboxes include/exclude each type. Sparkline = each family's rate trajectory across the lineage (to its own peak), within the active scope. Click a family name (or a circle) to inspect.</div>
+      <div style="font-family:'Spline Sans Mono',monospace;font-size:9px;line-height:1.5;color:#B7B5AE;margin-top:14px">Stage checkboxes include/exclude each checkpoint column across the whole view. Family checkboxes include/exclude each type. Sparkline = each family's rate trajectory across the lineage (to its own peak), within the active scope. Click a family row (or a bar segment or circle) to inspect.</div>
     </aside>
 
     <main class="rail-scroll" style="flex:1;min-width:0;overflow-y:auto;display:flex;flex-direction:column;gap:12px;padding:14px 18px 18px;background:#F6F5F2">

@@ -322,7 +322,7 @@ class Component extends DCLogic {
       const on=st.selFam===f.key;
       const hidden=!!st.hiddenFams[f.key];
       return { key:f.key, label:f.label, color:col(f.key), total:lintot(f), spark, checked:!hidden,
-        onClick:()=>this.pickFam(f.key), onToggle:()=>this.toggleFam(f.key),
+        onClick:()=>this.pickFam(f.key), onToggle:()=>this.toggleFam(f.key), stopProp:(e)=>e.stopPropagation(),
         rowStyle:'display:flex;flex-direction:column;gap:6px;padding:9px 9px;border-radius:8px;cursor:pointer;'+(on?'background:#EAF1EF;box-shadow:inset 2px 0 0 '+col(f.key)+';':'')+(hidden?'opacity:.32;':(st.selFam&&!on?'opacity:.4;':'')) };
     });
     const anyHidden = Object.keys(st.hiddenFams||{}).length>0;
